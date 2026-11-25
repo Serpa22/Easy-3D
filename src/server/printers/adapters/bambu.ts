@@ -11,7 +11,9 @@ import mqtt, { type MqttClient } from "mqtt";
 import type { PrinterState } from "../../../lib/domain";
 import type { PrinterTelemetry, TelemetryFilament } from "../../../lib/telemetry";
 import type { AdapterFactory } from "../types";
+import { isBlockedHost, parseTarget } from "../../../lib/net-target";
 import { arr, backoffMs, num, obj, str } from "./_shared";
+import { describeError } from "./_http";
 
 const STAGES: Record<number, string> = {
   1: "Nivelando la cama", 2: "Precalentando la cama", 3: "Compensación de vibraciones", 4: "Cambiando filamento", 5: "Pausa (M400)",
@@ -244,7 +246,10 @@ export function mergeBambu(target: Record<string, unknown>, patch: Record<string
 }
 
 export const createAdapter: AdapterFactory = (ctx) => {
-  const host = str(ctx.config.host);
+  const rawHost = str(ctx.config.host, 300);
+  const parsed = parseTarget(rawHost);
+  // mqtt.js quiere la IPv6 sin corchetes.
+  const host = parsed && !isBlockedHost(parsed.host) ? parsed.host.replace(/^\[|\]$/g, "") : undefined;
   const serial = str(ctx.config.serial);
   const accessCode = str(ctx.config.accessCode);
   const port = num(ctx.config.port) ?? 8883;
@@ -318,7 +323,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
       attempt = 0;
       lastMessageAt = Date.now();
       client?.subscribe(`device/${serial}/report`, { qos: 0 }, (error) => {
-        if (error) ctx.log("warn", `No se pudo suscribir al estado: ${error.message}`);
+        if (error) ctx.log("warn", `No se pudo suscribir al estado: ${describeError(error)}`);
       });
       request({ info: { sequence_id: "0", command: "get_version" } });
       pushAll();
@@ -354,7 +359,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
         scheduleReconnect(60_000);
         return;
       }
-      ctx.log("warn", `MQTT: ${error.message}`);
+      ctx.log("warn", `MQTT: ${describeError(error)}`);
     });
     client.on("close", () => {
       if (stopped) return;
@@ -365,7 +370,8 @@ export const createAdapter: AdapterFactory = (ctx) => {
 
   return {
     start() {
-      if (!host || !serial || !accessCode) return offline("Faltan la dirección IP, el número de serie o el código de acceso.");
+      if (!rawHost || !serial || !accessCode) return offline("Faltan la dirección IP, el número de serie o el código de acceso.");
+      if (!host) return offline("La dirección de la impresora no es válida. Revísala en los ajustes de la máquina.");
       offline();
       connect();
       watchdog = setInterval(() => {

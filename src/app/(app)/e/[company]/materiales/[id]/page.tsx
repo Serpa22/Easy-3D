@@ -6,7 +6,7 @@ import { z } from "zod";
 import { BarChart } from "@/components/charts/bar-chart";
 import { AdjustFields, MaterialFields, PurchaseFields, Swatch, WasteFields } from "@/components/materials/material-fields";
 import { ActionButton, ActionsMenu, FormDialogButton } from "@/components/ui/actions";
-import { Badge, Card, CardBody, CardHeader, DescriptionList, EmptyState, PageHeader, Stat, StatGrid } from "@/components/ui/display";
+import { Alert, Badge, Card, CardBody, CardHeader, DescriptionList, EmptyState, PageHeader, Stat, StatGrid } from "@/components/ui/display";
 import { ConfirmButton } from "@/components/ui/dialog";
 import { DataTable } from "@/components/ui/table";
 import { addDays, lastMonths, monthOf, todayISO } from "@/lib/dates";
@@ -30,8 +30,10 @@ export default async function MaterialPage({ params }: { params: Promise<{ compa
   const slug = company.slug;
   const base = `/e/${slug}`;
   const out = m.stockQty <= 0;
+  // El stock es la suma exacta de los movimientos: en negativo, faltan compras por registrar.
+  const negative = m.stockQty < 0;
   const low = !out && m.lowStockThreshold > 0 && m.stockQty < m.lowStockThreshold;
-  const daysLeft = used30 > 0 ? Math.round(m.stockQty / (used30 / 30)) : null;
+  const daysLeft = used30 > 0 ? Math.max(0, Math.round(m.stockQty / (used30 / 30))) : null;
   const perUnit = m.packSize > 0 ? m.packCostCents / m.packSize : 0;
   const unitPriceLabel = m.unit === "g" ? `${formatMoney(Math.round(perUnit * 1000))}/kg` : m.unit === "ml" ? `${formatMoney(Math.round(perUnit * 1000))}/L` : `${formatMoney(Math.round(perUnit))}/ud`;
 
@@ -48,7 +50,7 @@ export default async function MaterialPage({ params }: { params: Promise<{ compa
         description={
           <span className="flex flex-wrap items-center gap-2">
             {[MATERIAL_KIND_LABELS[m.kind], m.materialType, m.brand].filter(Boolean).join(" · ")}
-            {m.archivedAt ? <Badge>Archivado</Badge> : out ? <Badge tone="danger">Agotado</Badge> : low ? <Badge tone="warn">Stock bajo</Badge> : null}
+            {m.archivedAt ? <Badge>Archivado</Badge> : negative ? <Badge tone="danger">Stock negativo</Badge> : out ? <Badge tone="danger">Agotado</Badge> : low ? <Badge tone="warn">Stock bajo</Badge> : null}
           </span>
         }
         actions={
@@ -70,9 +72,14 @@ export default async function MaterialPage({ params }: { params: Promise<{ compa
           </>
         }
       />
+      {negative ? (
+        <Alert tone="warn" title="El stock está en negativo">
+          Se ha consumido más {m.name} del que consta comprado. Registra la compra que falta o ajusta el stock al recuento real; mientras tanto el consumo se sigue apuntando para que las cuentas cuadren.
+        </Alert>
+      ) : null}
       <StatGrid cols={4}>
-        <Stat label="Stock" value={formatQty(m.stockQty, m.unit)} hint={m.packSize > 0 ? `≈ ${formatNumber(m.stockQty / m.packSize, 1)} envases` : undefined} />
-        <Stat label="Valor en stock" value={formatMoney(Math.round(perUnit * m.stockQty))} hint={unitPriceLabel} />
+        <Stat label="Stock" value={formatQty(m.stockQty, m.unit)} hint={negative ? "Más consumo que compras registradas" : m.packSize > 0 ? `≈ ${formatNumber(m.stockQty / m.packSize, 1)} envases` : undefined} />
+        <Stat label="Valor en stock" value={formatMoney(Math.round(perUnit * Math.max(0, m.stockQty)))} hint={unitPriceLabel} />
         <Stat label="Consumo 30 días" value={formatQty(used30, m.unit)} />
         <Stat label="Stock para" value={daysLeft === null ? "—" : `${daysLeft} días`} hint={daysLeft === null ? "Sin consumo reciente" : "Al ritmo actual"} />
       </StatGrid>

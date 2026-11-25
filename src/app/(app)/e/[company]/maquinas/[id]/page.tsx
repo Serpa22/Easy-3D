@@ -18,7 +18,7 @@ import { deleteMachineAction, deleteMaintenanceAction, saveMaintenanceAction } f
 import { requireCompany } from "@/server/context";
 import type { MaintenanceLog } from "@/server/db/schema";
 import { listBridges } from "@/server/printers/bridges";
-import { getMachine, getMachineStats, listMachineEvents, listMachineJobs, listMaintenance, listMaterialOptions } from "@/server/queries/machines";
+import { getMachine, getMachineStats, hasMachinePurchaseExpense, listMachineEvents, listMachineJobs, listMaintenance, listMaterialOptions } from "@/server/queries/machines";
 
 type Props = { params: Promise<{ company: string; id: string }>; searchParams: Promise<SearchParams> };
 
@@ -213,7 +213,11 @@ export default async function MachinePage({ params, searchParams }: Props) {
   }
 
   if (tab === "ajustes") {
-    const [materials, bridges] = await Promise.all([listMaterialOptions(db, company.id), listBridges(db)]);
+    const [materials, bridges, purchaseRegistered] = await Promise.all([
+      listMaterialOptions(db, company.id),
+      listBridges(db),
+      hasMachinePurchaseExpense(db, company.id, machine.id),
+    ]);
     return (
       <>
         {header}
@@ -237,6 +241,8 @@ export default async function MachinePage({ params, searchParams }: Props) {
                 powerIdleW: machine.powerIdleW,
                 purchasePriceCents: machine.purchasePriceCents,
                 purchaseDate: machine.purchaseDate,
+                // La casilla refleja si la compra ya está en Finanzas: guardar no la borra por descuido.
+                registerPurchase: purchaseRegistered,
                 lifespanHours: machine.lifespanHours,
                 loadedMaterialId: machine.loadedMaterialId,
                 connectionType: machine.connectionType,

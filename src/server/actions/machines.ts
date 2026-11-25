@@ -55,6 +55,13 @@ export async function saveMachineAction(slug: string, _prev: ActionState, formDa
     const { company, db, org } = await requireCompany(slug);
     const input = parseForm(machineSchema, formData);
     if (input.purchaseDate && input.purchaseDate > todayISO(org.timeZone)) throw new ActionError("Revisa los campos marcados.", { purchaseDate: "No puede ser una fecha futura" });
+    if (input.registerPurchase && (!input.purchasePrice || !input.purchaseDate)) {
+      // La casilla refleja el gasto en Finanzas: sin precio o sin fecha no se puede mantener.
+      throw new ActionError("Revisa los campos marcados.", {
+        ...(input.purchasePrice ? {} : { purchasePrice: "Indica el precio para registrar la compra como gasto" }),
+        ...(input.purchaseDate ? {} : { purchaseDate: "Indica la fecha para registrar la compra como gasto" }),
+      });
+    }
 
     const machineId = await db.transaction(async (tx) => {
       const [existing] = input.id
@@ -115,7 +122,7 @@ export async function saveMachineAction(slug: string, _prev: ActionState, formDa
 }
 
 /** Prueba la conexión con los datos del formulario (sin guardar). */
-export async function testConnectionAction(slug: string, formData: FormData): Promise<ActionResult<ConnectionTestResult>> {
+export async function testConnectionAction(slug: string, formData: FormData): Promise<ActionResult<Pick<ConnectionTestResult, "ok" | "message">>> {
   return runAction(async () => {
     const { company, db } = await requireCompany(slug);
     const type = z.enum(CONNECTION_TYPES).parse(formData.get("connectionType"));
@@ -127,7 +134,8 @@ export async function testConnectionAction(slug: string, formData: FormData): Pr
     if (Object.keys(merged.errors).length > 0) throw new ActionError("Faltan datos de la conexión.", prefixErrors(merged.errors));
     const technology = String(formData.get("technology") ?? "fdm");
     const result = await testConnection(type, merged.config, { technology });
-    return { data: result };
+    // Al navegador solo va el veredicto: la telemetría de la prueba no hace falta.
+    return { data: { ok: result.ok, message: result.message } };
   });
 }
 

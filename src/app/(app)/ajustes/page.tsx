@@ -17,7 +17,6 @@ import { createUserAction, deleteBridgeAction, deleteUserAction, restoreCompanyA
 import { requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db";
 import { companies, users } from "@/server/db/schema";
-import { DEMO_MARKER } from "@/server/demo/seed";
 import { listBridges } from "@/server/printers/bridges";
 import { embeddedEnabled } from "@/server/printers/embedded";
 import { getOrgSettings } from "@/server/settings";
@@ -217,8 +216,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   }
 
   if (tab === "datos") {
-    const demoCompanies = await db.select({ description: companies.description }).from(companies);
-    const hasDemo = demoCompanies.some((c) => c.description === DEMO_MARKER);
+    const demoCompanies = await db.select({ id: companies.id }).from(companies).where(isNotNull(companies.demoKey)).limit(1);
+    const hasDemo = demoCompanies.length > 0;
     return (
       <>
         {header}

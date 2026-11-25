@@ -148,25 +148,20 @@ export async function updateClosedJob(db: Db, companyId: string, input: z.output
     if (!job) throw new ActionError("La impresión ya no existe.");
     if (!job.endedAt) throw new ActionError("Esta impresión sigue en curso. Termínala primero.");
     await assertOwned(tx, companyId, input);
-    // Primero se deshace el efecto anterior con los vínculos antiguos…
-    await finishPrintJob(tx, { companyId, jobId: job.id, status: job.status as "completed" | "failed" | "cancelled", endedAt: job.endedAt, durationSec: job.durationSec, materialUsed: 0, piecesProduced: 0, piecesFailed: 0, timeZone });
-    // …se cambian los vínculos…
-    await tx
-      .update(printJobs)
-      .set({ name: input.name, productId: input.productId, orderId: input.orderId, materialId: input.materialId, notes: input.notes })
-      .where(eq(printJobs.id, job.id));
-    // …y se vuelve a aplicar con los datos nuevos.
+    // Una sola pasada: `finishPrintJob` aplica solo la diferencia respecto a lo ya contado.
     return finishPrintJob(tx, {
       companyId,
       jobId: job.id,
       status: input.status,
       endedAt: job.endedAt,
-      durationSec: input.durationMinutes * 60,
+      // El formulario trabaja en minutos: si no se ha tocado, se conservan los segundos exactos.
+      durationSec: input.durationMinutes === Math.round(job.durationSec / 60) ? job.durationSec : input.durationMinutes * 60,
       materialUsed: input.materialUsed ?? 0,
       piecesProduced: input.status === "completed" ? (input.piecesProduced ?? 0) : 0,
       piecesFailed: input.piecesFailed ?? 0,
       errorMessage: input.status === "failed" ? input.errorMessage : null,
       timeZone,
+      changes: { name: input.name, notes: input.notes, productId: input.productId, orderId: input.orderId, materialId: input.materialId },
     });
   });
 }

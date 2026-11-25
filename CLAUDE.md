@@ -19,6 +19,7 @@ Toda la interfaz está en **español de España**. Moneda EUR, formato es-ES, zo
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run lint` — ESLint
 - `npm test` — tests unitarios (vitest)
+- `E3D_TEST_DATABASE_URL=postgres://… npm run test:pg` — los mismos tests contra un PostgreSQL real (vacía esa BD). Pásalos antes de dar por buena una consulta nueva: PGlite es más permisivo
 - `npm run test:e2e` — Playwright
 - `npm run db:generate` — genera una migración SQL en `drizzle/` tras cambiar `schema.ts` (se aplican solas al arrancar)
 - `npm run build` — build de producción
@@ -65,6 +66,10 @@ drizzle/                      migraciones SQL generadas
 6. **Libro contable derivado.** Los movimientos que nacen de otro registro (pedido cobrado, coste de envío, compra de material, mantenimiento, factura de luz…) NO se insertan a mano: usa `syncLedgerEntry()` / `removeLedgerEntry()` de `@/server/domain/ledger`, que los mantiene sincronizados e idempotentes.
 7. Las escrituras que tocan varias tablas van en `db.transaction(async (tx) => …)`.
 8. `machines.connectionConfig` contiene secretos (claves de acceso de impresoras): **nunca** se envía al navegador.
+9. **Instantes dentro de `sql\`…\``**: nunca interpoles un `Date` suelto (postgres-js falla; PGlite no). Usa `gte()/lt()` o `instant(fecha)` de `@/server/db/sql`.
+10. **Stock**. El de material es la suma exacta de sus movimientos y puede ser negativo (no lo recortes a 0). El de producto no baja de 0, así que quien lo descuenta apunta cuánto descontó de verdad (`order_items.stockDeductedQty`) y las correcciones aplican solo la diferencia: nunca «deshacer y volver a aplicar» a través de un `greatest(…, 0)`.
+11. **Empresas de ejemplo**: se reconocen solo por `companies.demoKey`, que escribe únicamente el generador de datos. Ni el nombre, ni la URL, ni la descripción autorizan a borrarlas ni a reutilizarlas.
+12. **Registros**: usa `logError()` de `@/server/log`, no `console.error(error)`: un error de consulta arrastra sus parámetros (claves, datos personales).
 
 ## Patrón de un módulo
 
@@ -97,4 +102,5 @@ Antes de dar algo por terminado: `npm run typecheck`, `npm run lint`, `npm test`
 
 - Un adaptador por protocolo en `src/server/printers/adapters/<tipo>.ts`: exporta `createAdapter` y una función pura `mapXxx` (probada) que traduce al modelo común `PrinterTelemetry` (`src/lib/telemetry.ts`).
 - `adapters/**`, `manager.ts`, `registry.ts` y `types.ts` se ejecutan también en el bridge (Node puro): no importan `server-only`, `next/*` ni alias `@/`.
+- La dirección de una impresora se valida con `src/lib/net-target.ts` (al guardar y otra vez en el adaptador). Los adaptadores no siguen redirecciones ni devuelven al usuario texto del equipo remoto; un secreto guardado no se reutiliza si cambia el destino (`mergeConnectionConfig`).
 - `ingest.ts` convierte telemetría en hechos (estado en directo, impresiones abiertas/cerradas, eventos). Toda apertura o cierre de impresión pasa por `domain/print-jobs.ts`.

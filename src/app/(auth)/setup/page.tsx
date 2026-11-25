@@ -13,6 +13,11 @@ export default async function SetupPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Configura Easy 3D</h1>
       <p className="mt-1.5 text-sm text-fg-2">Crea tu cuenta de propietario y tu primera sub-empresa. Podrás añadir más después.</p>
       <ActionForm action={setupAction} className="mt-8">
+        {process.env.E3D_SETUP_TOKEN ? (
+          <Field label="Código de instalación" name="setupToken" required hint="El valor de E3D_SETUP_TOKEN que configuraste al desplegar. Evita que otra persona cree la cuenta antes que tú.">
+            <Input type="password" autoComplete="off" maxLength={200} />
+          </Field>
+        ) : null}
         <Field label="Nombre de tu empresa" name="orgName" required hint="La empresa matriz que agrupa a las sub-empresas.">
           <Input defaultValue="Easy 3D" maxLength={80} />
         </Field>

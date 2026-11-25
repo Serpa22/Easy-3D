@@ -6,7 +6,7 @@ import type { PrinterState } from "../../../lib/domain";
 import type { PrinterTelemetry } from "../../../lib/telemetry";
 import type { AdapterFactory } from "../types";
 import { num, obj, str, titleFromFile } from "./_shared";
-import { HttpError, baseUrl, getJson } from "./_http";
+import { HttpError, baseUrl, describeError, getJson } from "./_http";
 
 const STATES: Record<string, PrinterState> = {
   IDLE: "idle",
@@ -90,14 +90,15 @@ export const createAdapter: AdapterFactory = (ctx) => {
       failures += 1;
       if (error instanceof HttpError && (error.status === 401 || error.status === 403)) offline("PrusaLink ha rechazado las credenciales (clave API o usuario y contraseña).");
       else offline();
-      if (failures === 1) ctx.log("warn", `No se pudo consultar PrusaLink: ${error instanceof Error ? error.message : String(error)}`);
+      if (failures === 1) ctx.log("warn", `No se pudo consultar PrusaLink: ${describeError(error)}`);
     }
     if (!stopped) timer = setTimeout(poll, failures > 0 ? Math.min(30_000, 3000 * failures) : 3000);
   };
 
   return {
     start() {
-      if (!base) return offline("Falta la dirección IP de la impresora.");
+      if (!str(ctx.config.host, 300)) return offline("Falta la dirección IP de la impresora.");
+      if (!base) return offline("La dirección de la impresora no es válida. Revísala en los ajustes de la máquina.");
       if (!auth.apiKey && !auth.password) return offline("Falta la clave API de PrusaLink (o el usuario y la contraseña).");
       offline();
       void poll();

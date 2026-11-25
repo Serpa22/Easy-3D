@@ -162,7 +162,7 @@ export default async function PrintsPage({ params, searchParams }: { params: Pro
               content: <FinishFields job={j} unit={materialUnit ?? "g"} now={now} />,
             });
           } else {
-            items.push({ type: "form", label: "Editar", icon: <Pencil />, title: "Editar impresión", description: "Al guardar se recalculan el consumo de material, las piezas en stock y el coste.", dialogSize: "lg", action: editPrintAction.bind(null, slug), content: <EditFields job={j} unit={materialUnit ?? "g"} options={options} /> });
+            items.push({ type: "form", label: "Editar", icon: <Pencil />, title: "Editar impresión", description: "Al guardar se recalculan el consumo de material, las piezas en stock y el coste.", dialogSize: "lg", action: editPrintAction.bind(null, slug), content: <EditFields job={j} unit={materialUnit ?? "g"} options={options} current={{ materialName, productName, orderNumber }} /> });
           }
           items.push({ type: "separator" });
           items.push({ type: "confirm", label: "Eliminar", icon: <Trash2 />, danger: true, title: `¿Eliminar «${j.name}»?`, description: "Se devolverán al stock el material consumido y se restarán las piezas y las horas de máquina que sumó.", action: deletePrintAction.bind(null, slug, j.id) });

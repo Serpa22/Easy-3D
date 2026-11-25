@@ -11,6 +11,7 @@
  */
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   date,
   doublePrecision,
@@ -120,6 +121,14 @@ export const companies = pgTable("companies", {
   targetMarginPct: doublePrecision("target_margin_pct").notNull().default(60),
   failureRatePct: doublePrecision("failure_rate_pct").notNull().default(5),
 
+  /**
+   * Empresa creada por «Cargar datos de ejemplo»: qué empresa de demostración es
+   * («teclas», «figuras»). Solo la escribe el generador de datos de ejemplo
+   * (ningún formulario la toca) y es lo ÚNICO que autoriza a «Eliminar datos de
+   * ejemplo» a borrar una empresa. null = empresa real.
+   */
+  demoKey: text("demo_key"),
+
   sortOrder: integer("sort_order").notNull().default(0),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -177,7 +186,7 @@ export const machines = pgTable(
     bridgeId: uuid("bridge_id").references(() => bridges.id, { onDelete: "set null" }),
 
     /** Material cargado ahora mismo: se descuenta al terminar una impresión. */
-    loadedMaterialId: uuid("loaded_material_id"),
+    loadedMaterialId: uuid("loaded_material_id").references((): AnyPgColumn => materials.id, { onDelete: "set null" }),
 
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),
@@ -196,6 +205,12 @@ export const machineLive = pgTable("machine_live", {
   state: text("state", { enum: PRINTER_STATES }).notNull().default("offline"),
   telemetry: jsonb("telemetry").$type<PrinterTelemetry>(),
   currentJobId: uuid("current_job_id"),
+  /**
+   * Lo último que se supo de la impresión en curso y cuándo. Sobrevive a los
+   * cortes de conexión (la telemetría «sin conexión» no trae datos del trabajo)
+   * y permite cerrar la impresión con SUS datos, no con los de la siguiente.
+   */
+  lastJob: jsonb("last_job").$type<{ at: string; facts: NonNullable<PrinterTelemetry["job"]> }>(),
   /** Última telemetría recibida. */
   updatedAt: timestamp("updated_at", { withTimezone: true }),
   /** Desde cuándo está en el estado actual. */
@@ -428,6 +443,12 @@ export const orderItems = pgTable(
     quantity: integer("quantity").notNull().default(1),
     unitPriceCents: integer("unit_price_cents").notNull().default(0),
     totalCents: integer("total_cents").notNull().default(0),
+    /**
+     * Unidades que esta línea ha descontado realmente del stock del producto al
+     * enviarse (puede ser menos que `quantity` si no había bastante). Al
+     * cancelar o editar el pedido se devuelve exactamente esta cantidad.
+     */
+    stockDeductedQty: integer("stock_deducted_qty").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(0),
   },
   (t) => [index("order_items_order_idx").on(t.orderId)],
@@ -531,6 +552,12 @@ export const recurringExpenses = pgTable(
     endDate: date("end_date", { mode: "string" }),
     /** Fecha del último cargo ya convertido en movimiento. */
     lastGeneratedDate: date("last_generated_date", { mode: "string" }),
+    /**
+     * No se generan cargos con fecha anterior a esta. Se fija al reanudar un gasto
+     * en pausa (no se cobran los meses parados) y al cambiar su calendario (no se
+     * cobra dos veces un periodo ya cargado).
+     */
+    chargeFrom: date("charge_from", { mode: "string" }),
     counterparty: text("counterparty"),
     active: boolean("active").notNull().default(true),
     createdAt: createdAt(),

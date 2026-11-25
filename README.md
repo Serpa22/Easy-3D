@@ -43,6 +43,8 @@ Para desarrollar: `npm run dev`.
 | `E3D_DATA_DIR` | Carpeta de la base embebida (por defecto `.data`) |
 | `E3D_EMBEDDED_PRINTERS` | `false` para que el servidor no se conecte a las impresoras (lo hará un bridge) |
 | `E3D_SECURE_COOKIES` | `true`/`false` para forzar cookies solo por HTTPS (por defecto se detecta) |
+| `E3D_SETUP_TOKEN` | Código que la pantalla de primer arranque pedirá para crear la cuenta de propietario. Ponlo si despliegas en internet, para que nadie se adelante |
+| `E3D_TRUST_PROXY` | Número de proxies propios delante de la app (nginx, Cloudflare…). Solo entonces se usa la IP del visitante para limitar intentos de acceso. En Vercel vale 1 por defecto |
 
 ## Conectar las impresoras
 
@@ -103,6 +105,8 @@ npm run typecheck   # tipos
 npm run lint        # ESLint
 npm test            # tests unitarios (lógica de negocio, ingesta de telemetría, adaptadores)
 npm run build && npm run test:e2e   # tests de extremo a extremo con Playwright
+# Los mismos tests unitarios contra un PostgreSQL real (¡vacía esa base de datos!):
+E3D_TEST_DATABASE_URL=postgres://usuario@localhost:5432/easy3d_test npm run test:pg
 ```
 
 ## Estructura

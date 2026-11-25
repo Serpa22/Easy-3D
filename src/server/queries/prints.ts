@@ -3,7 +3,7 @@ import "server-only";
 import { and, desc, eq, gte, ilike, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
 import { machines, materials, orders, printJobs, products } from "@/server/db/schema";
-import { count, countWhere, sum, sumWhere } from "@/server/db/sql";
+import { count, countWhere, instant, sum, sumWhere } from "@/server/db/sql";
 
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
@@ -57,7 +57,7 @@ export async function listPrintJobs(db: DbOrTx, companyId: string, f: PrintFilte
 }
 
 export async function getPrintKpis(db: DbOrTx, companyId: string, from: Date, to: Date) {
-  const inMonth = sql`${printJobs.startedAt} >= ${from} and ${printJobs.startedAt} < ${to}`;
+  const inMonth = sql`${printJobs.startedAt} >= ${instant(from)} and ${printJobs.startedAt} < ${instant(to)}`;
   const [[row], material] = await Promise.all([
     db
       .select({

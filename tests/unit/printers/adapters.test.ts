@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { WebSocketServer } from "ws";
 import { digestHeader } from "@/server/printers/adapters/_http";
 import { mapBambu, mergeBambu } from "@/server/printers/adapters/bambu";
-import { mapSdcp } from "@/server/printers/adapters/elegoo";
+import { createAdapter as elegoo, mapSdcp } from "@/server/printers/adapters/elegoo";
 import { createAdapter as moonraker, mapMoonraker } from "@/server/printers/adapters/moonraker";
 import { createAdapter as octoprint, mapOctoPrint } from "@/server/printers/adapters/octoprint";
 import { createAdapter as prusalink, mapPrusaLink } from "@/server/printers/adapters/prusalink";
@@ -235,5 +235,58 @@ describe("Elegoo SDCP (experimental)", () => {
     expect(mapSdcp({ CurrentStatus: [1], PrintInfo: { Status: 6, Filename: "a.ctb" } }).state).toBe("paused");
     expect(mapSdcp({ CurrentStatus: [0], PrintInfo: { Status: 9, Filename: "a.ctb", CurrentLayer: 10, TotalLayer: 10 } })).toMatchObject({ state: "finished", job: { progress: 100 } });
     expect(mapSdcp({ CurrentStatus: [1], PrintInfo: { Status: 1, Filename: "a.ctb" } }).state).toBe("preparing");
+  });
+});
+
+describe("seguridad de las conexiones", () => {
+  it("no sigue redirecciones: la clave no llega a otro servicio", async () => {
+    const internal: Array<{ url?: string; key?: string | string[] }> = [];
+    const secretService = await serve((req, res) => {
+      internal.push({ url: req.url, key: req.headers["x-api-key"] });
+      res.end("TOPSECRET-contenido interno");
+    });
+    const attacker = await serve((_req, res) => {
+      res.statusCode = 302;
+      res.setHeader("Location", `${secretService}/interno`);
+      res.end();
+    });
+    const logs: string[] = [];
+    const seen: PrinterTelemetry[] = [];
+    const adapter = octoprint({ machineId: "m", config: { baseUrl: attacker, apiKey: "clave-guardada" }, onTelemetry: (t) => seen.push(t), log: (_l, m) => logs.push(m) });
+    cleanups.push(() => adapter.stop());
+    adapter.start();
+    await new Promise((r) => setTimeout(r, 600));
+    expect(internal).toEqual([]);
+    expect(seen.every((t) => t.state === "offline")).toBe(true);
+    // El registro no contiene nada de la respuesta remota.
+    expect(logs.join(" ")).not.toContain("TOPSECRET");
+  });
+
+  it("una dirección mal escrita deja la máquina sin conexión, sin lanzar errores ni reintentar", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    try {
+      for (const [factory, config] of [
+        [moonraker, { host: "192.168.1.60:7125:7125" }],
+        [moonraker, { host: "mi impresora" }],
+        [moonraker, { host: "169.254.169.254" }],
+        [elegoo, { host: "192.168.1. 90" }],
+        [octoprint, { baseUrl: "http://exa mple", apiKey: "k" }],
+        [prusalink, { host: "http://u:p@192.168.1.80", apiKey: "k" }],
+      ] as const) {
+        const seen: PrinterTelemetry[] = [];
+        const adapter = factory({ machineId: "m", config, onTelemetry: (t) => seen.push(t), log: () => {} });
+        expect(() => adapter.start()).not.toThrow();
+        await new Promise((r) => setTimeout(r, 30));
+        await adapter.stop();
+        expect(seen).toHaveLength(1);
+        expect(seen[0]).toMatchObject({ state: "offline", errors: [{ message: expect.stringMatching(/no es válida/) }] });
+      }
+      await new Promise((r) => setTimeout(r, 50));
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
   });
 });

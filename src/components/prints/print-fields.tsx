@@ -9,13 +9,32 @@ export interface PrintOptions {
   orders: Array<{ id: string; number: string; customerName: string }>;
 }
 
-function Links({ options, job, materialId }: { options: PrintOptions; job?: PrintJob; materialId?: string | null }) {
+/** Vínculos actuales de una impresión, para que el formulario de edición nunca los pierda. */
+export interface PrintLinks {
+  materialName?: string | null;
+  productName?: string | null;
+  orderNumber?: string | null;
+}
+
+/**
+ * Añade a la lista la opción vinculada ahora mismo si ya no sale en el desplegable
+ * (material archivado, producto inactivo, pedido ya enviado…). Sin esto, guardar
+ * el formulario desvincularía el registro sin que nadie lo haya pedido.
+ */
+function withCurrent<T extends { id: string }>(list: T[], id: string | null | undefined, make: (id: string) => T): T[] {
+  return !id || list.some((x) => x.id === id) ? list : [make(id), ...list];
+}
+
+function Links({ options, job, materialId, current }: { options: PrintOptions; job?: PrintJob; materialId?: string | null; current?: PrintLinks }) {
+  const materials = withCurrent(options.materials, job?.materialId, (id) => ({ id, name: current?.materialName ?? "Material actual", unit: "" }));
+  const products = withCurrent(options.products, job?.productId, (id) => ({ id, name: current?.productName ?? "Producto actual" }));
+  const orders = withCurrent(options.orders, job?.orderId, (id) => ({ id, number: current?.orderNumber ?? "Pedido actual", customerName: "" }));
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <Field label="Material" name="materialId" hint={job ? undefined : "Vacío = el cargado en la máquina."}>
         <Select defaultValue={job?.materialId ?? materialId ?? ""}>
           <option value="">{job ? "Sin material" : "El de la máquina"}</option>
-          {options.materials.map((m) => (
+          {materials.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
             </option>
@@ -25,7 +44,7 @@ function Links({ options, job, materialId }: { options: PrintOptions; job?: Prin
       <Field label="Producto" name="productId">
         <Select defaultValue={job?.productId ?? ""}>
           <option value="">Sin producto</option>
-          {options.products.map((p) => (
+          {products.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
@@ -35,9 +54,9 @@ function Links({ options, job, materialId }: { options: PrintOptions; job?: Prin
       <Field label="Pedido" name="orderId">
         <Select defaultValue={job?.orderId ?? ""}>
           <option value="">Sin pedido</option>
-          {options.orders.map((o) => (
+          {orders.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.number} · {o.customerName}
+              {[o.number, o.customerName].filter(Boolean).join(" · ")}
             </option>
           ))}
         </Select>
@@ -152,7 +171,7 @@ export function FinishFields({ job, unit, now }: { job: PrintJob; unit: string; 
   );
 }
 
-export function EditFields({ job, unit, options }: { job: PrintJob; unit: string; options: PrintOptions }) {
+export function EditFields({ job, unit, options, current }: { job: PrintJob; unit: string; options: PrintOptions; current?: PrintLinks }) {
   return (
     <>
       <input type="hidden" name="jobId" value={job.id} />
@@ -164,7 +183,7 @@ export function EditFields({ job, unit, options }: { job: PrintJob; unit: string
           <NumberInput unit="min" defaultValue={String(Math.round(job.durationSec / 60))} />
         </Field>
       </div>
-      <Links options={options} job={job} />
+      <Links options={options} job={job} current={current} />
       <Outcome job={job} unit={unit} />
     </>
   );

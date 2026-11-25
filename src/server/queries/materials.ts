@@ -9,13 +9,16 @@ import { MATERIAL_KINDS, type MaterialKind } from "@/lib/domain";
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 /** Valor en stock de un material: envases equivalentes × precio del envase. */
-export const stockValueSql = sql<number>`case when ${materials.packSize} > 0 then ${materials.stockQty} / ${materials.packSize} * ${materials.packCostCents} else 0 end`;
+export const stockValueSql = sql<number>`case when ${materials.packSize} > 0 then greatest(${materials.stockQty}, 0) / ${materials.packSize} * ${materials.packCostCents} else 0 end`;
+
+/** Bajo el mínimo configurado, o en negativo (más consumo que compras registradas). */
+const needsAttention = sql`((${materials.lowStockThreshold} > 0 and ${materials.stockQty} < ${materials.lowStockThreshold}) or ${materials.stockQty} < 0)`;
 
 export async function listMaterials(db: DbOrTx, companyId: string, f: { kind?: string; q?: string; lowOnly?: boolean; archived?: boolean } = {}) {
   const base: SQL[] = [eq(materials.companyId, companyId), f.archived ? isNotNull(materials.archivedAt) : isNull(materials.archivedAt)];
   const q = f.q?.trim();
   if (q) base.push(or(ilike(materials.name, like(q)), ilike(materials.brand, like(q)), ilike(materials.materialType, like(q)), ilike(materials.colorName, like(q))) as SQL);
-  if (f.lowOnly) base.push(sql`${materials.lowStockThreshold} > 0 and ${materials.stockQty} < ${materials.lowStockThreshold}`);
+  if (f.lowOnly) base.push(needsAttention);
   const [counts] = await db
     .select({
       todos: count(),
@@ -41,7 +44,7 @@ export async function getMaterialKpis(db: DbOrTx, companyId: string, monthFrom: 
     db
       .select({
         valueCents: sql<number>`coalesce(sum(${stockValueSql}), 0)::double precision`.mapWith(Number),
-        low: countWhere(sql`${materials.lowStockThreshold} > 0 and ${materials.stockQty} < ${materials.lowStockThreshold}`),
+        low: countWhere(needsAttention),
       })
       .from(materials)
       .where(and(eq(materials.companyId, companyId), isNull(materials.archivedAt))),

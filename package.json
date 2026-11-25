@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:pg": "vitest run --no-file-parallelism",
     "test:e2e": "playwright test --trace off",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx scripts/seed.ts",

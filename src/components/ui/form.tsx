@@ -344,7 +344,9 @@ export function ActionForm({ action, onSuccess, successToast = true, resetOnSucc
 
   return (
     <FormContext.Provider value={{ pending, fieldErrors }}>
-      <form ref={formRef} onSubmit={onSubmit} className={cn("flex flex-col gap-4", className)} {...props}>
+      {/* method="post": si se envía antes de que cargue el JavaScript, los campos (contraseñas, claves)
+          viajan en el cuerpo de la petición y nunca acaban en la URL ni en el historial. */}
+      <form ref={formRef} method="post" onSubmit={onSubmit} className={cn("flex flex-col gap-4", className)} {...props}>
         {formError ? (
           <div role="alert" className="flex items-start gap-2 rounded-md border border-danger bg-danger-dim px-3 py-2.5 text-sm text-fg">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />

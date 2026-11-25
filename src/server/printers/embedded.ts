@@ -6,6 +6,7 @@
 import "server-only";
 import { and, isNull, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
+import { logError } from "@/server/log";
 import { machines } from "@/server/db/schema";
 import { applyTelemetry } from "./ingest";
 import { PrinterManager } from "./manager";
@@ -36,7 +37,7 @@ export async function syncEmbeddedPrinters(): Promise<void> {
         {
           deliver: async (items) => {
             for (const item of items) {
-              await applyTelemetry(db, item).catch((error) => console.error("[impresoras] ingesta", error));
+              await applyTelemetry(db, item).catch((error) => logError("impresoras · ingesta", error));
             }
           },
         },
@@ -48,7 +49,7 @@ export async function syncEmbeddedPrinters(): Promise<void> {
         .where(and(ne(machines.connectionType, "none"), isNull(machines.bridgeId), ne(machines.status, "retired")));
       await holder.manager.sync(rows.map((m) => ({ id: m.id, connectionType: m.connectionType, config: m.config ?? {}, meta: { name: m.name, technology: m.technology } })));
     } catch (error) {
-      console.error("[impresoras] no se pudo sincronizar", error);
+      logError("impresoras · sincronización", error);
     } finally {
       holder.syncing = undefined;
     }

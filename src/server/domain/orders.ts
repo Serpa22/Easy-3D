@@ -35,17 +35,50 @@ async function loadOrder(tx: DbOrTx, companyId: string, orderId: string): Promis
   return order;
 }
 
-async function moveStock(tx: DbOrTx, order: Order, direction: 1 | -1): Promise<void> {
+/**
+ * Descuenta del stock de producto las unidades del pedido. El stock nunca baja
+ * de 0 (hay quien fabrica bajo pedido y no lleva stock), así que cada línea
+ * apunta cuántas unidades ha descontado de verdad.
+ */
+async function deductStock(tx: DbOrTx, order: Order): Promise<void> {
   const items = await tx
-    .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+    .select({ id: orderItems.id, productId: orderItems.productId, quantity: orderItems.quantity })
     .from(orderItems)
     .where(eq(orderItems.orderId, order.id));
   for (const item of items) {
     if (!item.productId || item.quantity <= 0) continue;
+    const [product] = await tx
+      .select({ stockQty: products.stockQty })
+      .from(products)
+      .where(and(eq(products.id, item.productId), eq(products.companyId, order.companyId)))
+      .for("update")
+      .limit(1);
+    if (!product) continue;
+    const deducted = Math.min(item.quantity, Math.max(0, product.stockQty));
+    if (deducted <= 0) continue;
     await tx
       .update(products)
-      .set({ stockQty: sql`greatest(${products.stockQty} + ${direction * item.quantity}, 0)` })
+      .set({ stockQty: sql`${products.stockQty} - ${deducted}` })
       .where(and(eq(products.id, item.productId), eq(products.companyId, order.companyId)));
+    await tx.update(orderItems).set({ stockDeductedQty: deducted }).where(eq(orderItems.id, item.id));
+  }
+}
+
+/** Devuelve al stock exactamente lo que cada línea descontó (ni más ni menos). */
+async function returnStock(tx: DbOrTx, order: Order): Promise<void> {
+  const items = await tx
+    .select({ id: orderItems.id, productId: orderItems.productId, deducted: orderItems.stockDeductedQty })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id));
+  for (const item of items) {
+    if (item.deducted <= 0) continue;
+    if (item.productId) {
+      await tx
+        .update(products)
+        .set({ stockQty: sql`${products.stockQty} + ${item.deducted}` })
+        .where(and(eq(products.id, item.productId), eq(products.companyId, order.companyId)));
+    }
+    await tx.update(orderItems).set({ stockDeductedQty: 0 }).where(eq(orderItems.id, item.id));
   }
 }
 
@@ -56,7 +89,7 @@ async function moveStock(tx: DbOrTx, order: Order, direction: 1 | -1): Promise<v
 export async function restoreOrderStock(tx: DbOrTx, companyId: string, orderId: string): Promise<void> {
   const order = await loadOrder(tx, companyId, orderId);
   if (!order.stockDeducted) return;
-  await moveStock(tx, order, 1);
+  await returnStock(tx, order);
   await tx.update(orders).set({ stockDeducted: false }).where(eq(orders.id, order.id));
 }
 
@@ -101,10 +134,10 @@ export async function syncOrderEffects(tx: DbOrTx, companyId: string, orderId: s
 
   const shouldDeduct = STOCK_OUT_STATUSES.includes(order.status);
   if (shouldDeduct && !order.stockDeducted) {
-    await moveStock(tx, order, -1);
+    await deductStock(tx, order);
     await tx.update(orders).set({ stockDeducted: true }).where(eq(orders.id, order.id));
   } else if (!shouldDeduct && order.stockDeducted) {
-    await moveStock(tx, order, 1);
+    await returnStock(tx, order);
     await tx.update(orders).set({ stockDeducted: false }).where(eq(orders.id, order.id));
   }
 }

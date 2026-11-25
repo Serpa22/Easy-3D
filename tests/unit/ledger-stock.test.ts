@@ -149,7 +149,7 @@ describe("stock de material", () => {
     expect(tx[0]).toMatchObject({ type: "expense", category: "materials", amountCents: 3600, counterparty: "Filamentos SL", sourceType: "material_purchase" });
   });
 
-  it("consumo y merma restan (sin bajar de cero) y no generan gasto", async () => {
+  it("consumo y merma restan y no generan gasto; el stock es un balance exacto (puede ser negativo)", async () => {
     const db = await getDb();
     const company = await makeCompany();
     const m = await makeMaterial(company.id);
@@ -159,9 +159,30 @@ describe("stock de material", () => {
     expect(after.stockQty).toBe(350);
     await applyMaterialMovement(db, { companyId: company.id, materialId: m.id, type: "consumption", qty: 9999, date: "2026-11-22" });
     [after] = await db.select().from(materials).where(eq(materials.id, m.id));
-    expect(after.stockQty).toBe(0);
+    // Más consumo que existencias: queda en negativo en vez de perder la diferencia.
+    expect(after.stockQty).toBe(350 - 9999);
     expect(await db.select().from(transactions)).toHaveLength(0);
     expect(materialCostCents(m, 120)).toBe(240);
+  });
+
+  it("deshacer una compra ya consumida y volver a registrarla deja el stock cuadrado con los movimientos", async () => {
+    const db = await getDb();
+    const company = await makeCompany();
+    const [m] = await db.insert(materials).values({ companyId: company.id, name: "PETG", unit: "g", stockQty: 0, packSize: 1000, packCostCents: 0 }).returning();
+    const stock = async () => (await db.select().from(materials).where(eq(materials.id, m.id)))[0].stockQty;
+    const balance = async () => (await db.select().from(materialMovements).where(eq(materialMovements.materialId, m.id))).reduce((a, x) => a + x.qty, 0);
+
+    const purchase = await applyMaterialMovement(db, { companyId: company.id, materialId: m.id, type: "purchase", qty: 1000, totalCostCents: 2500, date: "2026-11-01" });
+    await applyMaterialMovement(db, { companyId: company.id, materialId: m.id, type: "consumption", qty: 900, date: "2026-11-10" });
+    expect(await stock()).toBe(100);
+
+    // Se deshace la compra (precio mal apuntado) y se vuelve a registrar bien.
+    await revertMaterialMovement(db, company.id, purchase.movementId);
+    expect(await stock()).toBe(-900);
+    await applyMaterialMovement(db, { companyId: company.id, materialId: m.id, type: "purchase", qty: 1000, totalCostCents: 2200, date: "2026-11-01" });
+    expect(await stock()).toBe(100);
+    expect(await stock()).toBe(await balance());
+    expect((await db.select().from(transactions)).map((t) => t.amountCents)).toEqual([2200]);
   });
 
   it("revertir una compra devuelve el stock y borra su gasto", async () => {

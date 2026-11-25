@@ -42,7 +42,7 @@ export async function getCompanyOverview(db: DbOrTx, companyId: string, slug: st
     db
       .select({ id: materials.id, name: materials.name, stockQty: materials.stockQty })
       .from(materials)
-      .where(and(eq(materials.companyId, companyId), isNull(materials.archivedAt), sql`${materials.lowStockThreshold} > 0`, sql`${materials.stockQty} < ${materials.lowStockThreshold}`))
+      .where(and(eq(materials.companyId, companyId), isNull(materials.archivedAt), sql`((${materials.lowStockThreshold} > 0 and ${materials.stockQty} < ${materials.lowStockThreshold}) or ${materials.stockQty} < 0)`))
       .orderBy(asc(materials.stockQty))
       .limit(6),
     db
@@ -120,7 +120,7 @@ export async function getCompanyOverview(db: DbOrTx, companyId: string, slug: st
     attention.push({ key: `s-${s.id}`, tone: s.status === "incident" ? "danger" : "warn", text: `Envío a ${s.recipientName ?? "cliente"}: ${s.status === "incident" ? "incidencia" : "entrega prevista superada"}`, href: `${base}/envios?estado=curso` });
   }
   for (const o of readyNoShipment) attention.push({ key: `r-${o.id}`, tone: "warn", text: `Pedido ${o.number} listo y sin envío creado`, href: `${base}/pedidos/${o.id}` });
-  for (const m of lowMaterials) attention.push({ key: `m-${m.id}`, tone: m.stockQty <= 0 ? "danger" : "warn", text: `${m.name}: ${m.stockQty <= 0 ? "agotado" : "stock bajo"}`, href: `${base}/materiales/${m.id}` });
+  for (const m of lowMaterials) attention.push({ key: `m-${m.id}`, tone: m.stockQty <= 0 ? "danger" : "warn", text: `${m.name}: ${m.stockQty < 0 ? "stock negativo (falta registrar una compra)" : m.stockQty <= 0 ? "agotado" : "stock bajo"}`, href: `${base}/materiales/${m.id}` });
   for (const m of overdueMaintenance) attention.push({ key: `mt-${m.machineId}`, tone: "warn", text: `${m.name}: revisión de mantenimiento vencida`, href: `${base}/maquinas/${m.machineId}?tab=mantenimiento` });
   if (deliveredUnpaid[0].n > 0) attention.push({ key: "unpaid", tone: "warn", text: `${deliveredUnpaid[0].n} ${deliveredUnpaid[0].n === 1 ? "pedido entregado sin cobrar" : "pedidos entregados sin cobrar"}`, href: `${base}/pedidos?estado=entregados` });
 
@@ -175,7 +175,7 @@ export async function getGroupOverview(db: DbOrTx, companyIds: string[], month: 
     db
       .select({ companyId: materials.companyId, n: count() })
       .from(materials)
-      .where(and(inArray(materials.companyId, companyIds), isNull(materials.archivedAt), sql`${materials.lowStockThreshold} > 0`, sql`${materials.stockQty} < ${materials.lowStockThreshold}`))
+      .where(and(inArray(materials.companyId, companyIds), isNull(materials.archivedAt), sql`((${materials.lowStockThreshold} > 0 and ${materials.stockQty} < ${materials.lowStockThreshold}) or ${materials.stockQty} < 0)`))
       .groupBy(materials.companyId),
   ]);
   for (const row of tx) {

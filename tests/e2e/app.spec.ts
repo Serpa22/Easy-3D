@@ -64,6 +64,40 @@ test("finanzas: crea, valida y elimina un gasto manual", async () => {
   await expect(page.getByRole("row", { name: /Pinzas de precisión E2E/ })).toHaveCount(0);
 });
 
+test("máquina: editarla no borra su gasto de compra, y una dirección mal escrita se rechaza", async () => {
+  await page.goto("/e/teclas/maquinas");
+  await page.getByRole("button", { name: "Añadir máquina" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/^Nombre/).fill("Impresora E2E");
+  await dialog.getByLabel("Precio de compra").fill("699");
+  await dialog.getByRole("textbox", { name: "Fecha de compra" }).fill("2026-01-15");
+  await dialog.getByLabel("Registrar la compra como gasto en Finanzas").check();
+  // Dirección de Moonraker mal escrita: se rechaza al guardar, con el error en su campo.
+  await dialog.getByLabel("Tipo de conexión").selectOption("moonraker");
+  await dialog.getByLabel(/^Dirección \(IP o nombre\)/).fill("192.168.1.60:7125:7125");
+  await dialog.getByRole("button", { name: "Añadir máquina" }).click();
+  await expect(dialog.getByText(/Dirección no válida/)).toBeVisible();
+  await dialog.getByLabel("Tipo de conexión").selectOption("none");
+  await dialog.getByRole("button", { name: "Añadir máquina" }).click();
+  await expect(page.getByText("Máquina añadida")).toBeVisible();
+
+  const expense = () => page.getByRole("row", { name: /Compra de Impresora E2E/ });
+  await page.goto("/e/teclas/finanzas?mes=2026-01");
+  await expect(expense()).toContainText("−699,00 €");
+
+  // Se edita otro dato de la máquina y se guarda: la casilla sale marcada y el gasto sigue ahí.
+  await page.goto("/e/teclas/maquinas");
+  await page.getByRole("link", { name: "Impresora E2E" }).click();
+  await expect(page).toHaveURL(/\/maquinas\/[0-9a-f-]{36}$/);
+  await page.goto(`${page.url()}?tab=ajustes`);
+  await expect(page.getByLabel("Registrar la compra como gasto en Finanzas")).toBeChecked();
+  await page.getByLabel("Ubicación").fill("Estantería 2");
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page.getByText("Máquina actualizada")).toBeVisible();
+  await page.goto("/e/teclas/finanzas?mes=2026-01");
+  await expect(expense()).toContainText("−699,00 €");
+});
+
 test("pedido: al cobrarlo aparece el ingreso en finanzas y no se ve desde otra sub-empresa", async () => {
   await page.goto("/e/teclas/pedidos/nuevo");
   await page.getByLabel(/^Nombre/).fill("Cliente E2E");
@@ -103,4 +137,18 @@ test("sesión: cerrar sesión protege la app y el acceso exige la contraseña co
   await page.getByLabel("Contraseña").fill(USER.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Easy 3D" })).toBeVisible();
+});
+
+test("sin JavaScript, enviar el acceso no deja la contraseña en la URL", async ({ browser }) => {
+  // Lo mismo ocurre si alguien pulsa «Entrar» antes de que la página termine de cargar.
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const plain = await context.newPage();
+  await plain.goto("/login");
+  await plain.fill("input[name=email]", USER.email);
+  await plain.fill("input[name=password]", "no-debe-verse");
+  await plain.locator("form button[type=submit]").click();
+  await plain.waitForLoadState();
+  expect(plain.url()).not.toContain("no-debe-verse");
+  expect(plain.url()).not.toContain("password");
+  await context.close();
 });

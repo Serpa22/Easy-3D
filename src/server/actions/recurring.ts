@@ -10,7 +10,7 @@ import { zCents, zCheckbox, zDate, zId, zOptionalDate, zOptionalDecimal, zOption
 import { ActionError, parseForm, parseInput, runAction } from "@/server/action";
 import { requireCompany } from "@/server/context";
 import { recurringExpenses } from "@/server/db/schema";
-import { generateRecurringCharges } from "@/server/domain/recurring";
+import { saveRecurring, setRecurringActive } from "@/server/domain/recurring";
 
 const schema = z
   .object({
@@ -31,15 +31,9 @@ export async function saveRecurringAction(slug: string, _prev: ActionState, form
   return runAction(async () => {
     const { company, db, org } = await requireCompany(slug);
     const { id, amount, ...input } = parseForm(schema, formData);
-    const values = { ...input, amountCents: amount, vatRatePct: input.vatRatePct ?? 21 };
-    if (id) {
-      const updated = await db.update(recurringExpenses).set(values).where(and(eq(recurringExpenses.id, id), eq(recurringExpenses.companyId, company.id))).returning({ id: recurringExpenses.id });
-      if (updated.length === 0) throw new ActionError("El gasto recurrente ya no existe.");
-    } else {
-      await db.insert(recurringExpenses).values({ ...values, companyId: company.id });
-    }
-    // Los cargos ya vencidos aparecen al momento en Movimientos.
-    const created = await generateRecurringCharges(db, company.id, todayISO(org.timeZone));
+    const { created } = await db.transaction((tx) =>
+      saveRecurring(tx, company.id, id, { ...input, amountCents: amount, vatRatePct: input.vatRatePct ?? 21 }, todayISO(org.timeZone)),
+    );
     revalidatePath(`/e/${slug}`, "layout");
     return { message: `${id ? "Gasto recurrente actualizado" : "Gasto recurrente creado"}${created > 0 ? ` · ${created} ${created === 1 ? "cargo generado" : "cargos generados"}` : ""}` };
   });
@@ -47,11 +41,10 @@ export async function saveRecurringAction(slug: string, _prev: ActionState, form
 
 export async function setRecurringActiveAction(slug: string, id: string, active: boolean): Promise<ActionResult> {
   return runAction(async () => {
-    const { company, db } = await requireCompany(slug);
-    const updated = await db.update(recurringExpenses).set({ active: Boolean(active) }).where(and(eq(recurringExpenses.id, parseInput(zId(), id)), eq(recurringExpenses.companyId, company.id))).returning({ id: recurringExpenses.id });
-    if (updated.length === 0) throw new ActionError("El gasto recurrente ya no existe.");
+    const { company, db, org } = await requireCompany(slug);
+    await db.transaction((tx) => setRecurringActive(tx, company.id, parseInput(zId(), id), Boolean(active), todayISO(org.timeZone)));
     revalidatePath(`/e/${slug}`, "layout");
-    return { message: active ? "Gasto reanudado" : "Gasto en pausa" };
+    return { message: active ? "Gasto reanudado: los meses en pausa no se cobran" : "Gasto en pausa" };
   });
 }
 

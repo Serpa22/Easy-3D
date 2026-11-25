@@ -97,4 +97,13 @@ async function main() {
   await poll();
 }
 
+// Un fallo inesperado en una máquina no debe tumbar el bridge ni dejar sin
+// seguimiento al resto de impresoras: se registra y se sigue.
+process.on("unhandledRejection", (reason) => {
+  log("error", `Error no controlado: ${reason instanceof Error ? reason.message : String(reason)}`);
+});
+process.on("uncaughtException", (error) => {
+  log("error", `Excepción no controlada: ${error.message}`);
+});
+
 void main();

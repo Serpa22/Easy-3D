@@ -6,7 +6,7 @@ import type { PrinterState } from "../../../lib/domain";
 import type { PrinterTelemetry } from "../../../lib/telemetry";
 import type { AdapterFactory } from "../types";
 import { num, obj, str, titleFromFile } from "./_shared";
-import { HttpError, baseUrl, getJson } from "./_http";
+import { HttpError, baseUrl, describeError, getJson } from "./_http";
 
 /** Traduce `/api/job` + `/api/printer` al modelo común. `printer` es null si OctoPrint responde 409 (impresora no operativa). */
 export function mapOctoPrint(jobRes: unknown, printerRes: unknown, firmware?: string): PrinterTelemetry {
@@ -90,14 +90,15 @@ export const createAdapter: AdapterFactory = (ctx) => {
       failures += 1;
       if (error instanceof HttpError && (error.status === 401 || error.status === 403)) offline("OctoPrint ha rechazado la clave API.");
       else offline();
-      if (failures === 1) ctx.log("warn", `No se pudo consultar OctoPrint: ${error instanceof Error ? error.message : String(error)}`);
+      if (failures === 1) ctx.log("warn", `No se pudo consultar OctoPrint: ${describeError(error)}`);
     }
     if (!stopped) timer = setTimeout(poll, failures > 0 ? Math.min(30_000, 3000 * failures) : 3000);
   };
 
   return {
     start() {
-      if (!base || !auth.apiKey) return offline("Faltan la dirección de OctoPrint o la clave API.");
+      if (!str(ctx.config.baseUrl, 300) || !auth.apiKey) return offline("Faltan la dirección de OctoPrint o la clave API.");
+      if (!base) return offline("La dirección de OctoPrint no es válida. Revísala en los ajustes de la máquina.");
       offline();
       void poll();
     },

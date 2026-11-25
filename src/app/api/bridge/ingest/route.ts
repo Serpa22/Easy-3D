@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
+import { logError } from "@/server/log";
 import { machines } from "@/server/db/schema";
 import { authenticateBridge } from "@/server/printers/bridges";
 import { applyTelemetry } from "@/server/printers/ingest";
@@ -23,14 +24,39 @@ const bodySchema = z.object({
     .max(100),
 });
 
+/**
+ * Lee el cuerpo con un tope: se rechaza por `Content-Length` antes de leer nada
+ * y, si el tamaño no se declara o es falso, se corta en cuanto se supera el
+ * límite (nunca se acumula un cuerpo enorme en memoria).
+ */
+async function readBody(request: NextRequest, maxBytes: number): Promise<string | null> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /** Recibe telemetría de un bridge. Solo se aceptan máquinas asignadas a ese bridge. */
 export async function POST(request: NextRequest) {
   const db = await getDb();
   const bridge = await authenticateBridge(db, request.headers.get("authorization"), request.headers.get("x-bridge-version"));
   if (!bridge) return NextResponse.json({ error: "Token no válido" }, { status: 401 });
 
-  const text = await request.text();
-  if (text.length > MAX_BODY) return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
+  const text = await readBody(request, MAX_BODY);
+  if (text === null) return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -51,7 +77,7 @@ export async function POST(request: NextRequest) {
       await applyTelemetry(db, { machineId: item.machineId, telemetry: item.telemetry as never, at: item.at });
       accepted += 1;
     } catch (error) {
-      console.error("[bridge] ingesta", error);
+      logError("bridge · ingesta", error);
     }
   }
   return NextResponse.json({ ok: true, accepted });

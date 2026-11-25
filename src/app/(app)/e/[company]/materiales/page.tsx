@@ -76,8 +76,9 @@ export default async function MaterialsPage({ params, searchParams }: { params: 
         ]}
         rows={list.rows.map((m) => {
           const out = m.stockQty <= 0;
+          const negative = m.stockQty < 0;
           const low = !out && m.lowStockThreshold > 0 && m.stockQty < m.lowStockThreshold;
-          const packs = m.packSize > 0 ? m.stockQty / m.packSize : 0;
+          const packs = m.packSize > 0 ? Math.max(0, m.stockQty) / m.packSize : 0;
           return {
             key: m.id,
             href: `${basePath}/${m.id}`,
@@ -90,9 +91,9 @@ export default async function MaterialsPage({ params, searchParams }: { params: 
               <div key="s">
                 <div className="flex items-center justify-between gap-2">
                   <span className="whitespace-nowrap font-mono tabular">{formatQty(m.stockQty, m.unit)}</span>
-                  {out ? <Badge tone="danger">Agotado</Badge> : low ? <Badge tone="warn">Stock bajo</Badge> : <span className="text-xs text-fg-3">≈ {formatNumber(packs, 1)} env.</span>}
+                  {negative ? <Badge tone="danger">Stock negativo</Badge> : out ? <Badge tone="danger">Agotado</Badge> : low ? <Badge tone="warn">Stock bajo</Badge> : <span className="text-xs text-fg-3">≈ {formatNumber(packs, 1)} env.</span>}
                 </div>
-                <Progress value={m.packSize > 0 ? Math.min(100, (m.stockQty / Math.max(m.packSize, m.stockQty)) * 100) : 0} tone={out ? "danger" : low ? "warn" : "neutral"} label={`Stock de ${m.name}`} className="mt-1.5" />
+                <Progress value={m.packSize > 0 ? Math.max(0, Math.min(100, (m.stockQty / Math.max(m.packSize, m.stockQty)) * 100)) : 0} tone={out ? "danger" : low ? "warn" : "neutral"} label={`Stock de ${m.name}`} className="mt-1.5" />
               </div>,
               m.lowStockThreshold > 0 ? formatQty(m.lowStockThreshold, m.unit) : "—",
               m.packCostCents > 0 ? formatMoney(m.packCostCents) : "—",

@@ -12,6 +12,7 @@ import type { DbOrTx } from "@/server/db";
 import { recurringExpenses, type RecurringExpense } from "@/server/db/schema";
 import type { RecurringFrequency, TransactionCategory } from "@/lib/domain";
 import { addMonthsToDate } from "@/lib/dates";
+import { ActionError } from "@/server/action";
 import { syncLedgerEntry } from "./ledger";
 
 const STEP_MONTHS: Record<RecurringFrequency, number> = { monthly: 1, quarterly: 3, yearly: 12 };
@@ -23,7 +24,7 @@ const MAX_CHARGES_PER_RUN = 240;
  * Los cargos caen el mismo día del mes que `startDate` (ajustado a fin de mes).
  */
 export function pendingChargeDates(
-  rec: Pick<RecurringExpense, "startDate" | "endDate" | "frequency" | "lastGeneratedDate" | "active">,
+  rec: Pick<RecurringExpense, "startDate" | "endDate" | "frequency" | "lastGeneratedDate" | "active"> & { chargeFrom?: string | null },
   today: string,
 ): string[] {
   if (!rec.active) return [];
@@ -35,6 +36,8 @@ export function pendingChargeDates(
     const date = addMonthsToDate(rec.startDate, k * step);
     if (date > limit) break;
     if (rec.lastGeneratedDate && date <= rec.lastGeneratedDate) continue;
+    // Periodos en pausa o ya cubiertos por el calendario anterior: no se cobran.
+    if (rec.chargeFrom && date < rec.chargeFrom) continue;
     out.push(date);
   }
   return out;
@@ -103,4 +106,66 @@ export async function generateRecurringCharges(db: DbOrTx, companyId: string, to
       .where(and(eq(recurringExpenses.id, rec.id), eq(recurringExpenses.companyId, companyId)));
   }
   return created;
+}
+
+const later = (...dates: Array<string | null | undefined>): string | null => dates.filter((d): d is string => Boolean(d)).sort().pop() ?? null;
+
+export interface RecurringInput {
+  name: string;
+  category: string;
+  amountCents: number;
+  vatRatePct: number;
+  frequency: RecurringFrequency;
+  startDate: string;
+  endDate: string | null;
+  counterparty: string | null;
+  active: boolean;
+}
+
+/**
+ * Crea o edita un gasto recurrente y genera sus cargos vencidos.
+ *
+ * Al editar:
+ *  - si se reactiva, los cargos del tiempo en pausa NO se generan;
+ *  - si cambia el calendario (fecha inicial o frecuencia) y ya tenía cargos, el
+ *    periodo ya cobrado no se vuelve a cobrar: el calendario nuevo rige desde
+ *    que termina ese periodo.
+ */
+export async function saveRecurring(db: DbOrTx, companyId: string, id: string | null, input: RecurringInput, today: string): Promise<{ id: string; created: number }> {
+  let recurringId = id;
+  if (id) {
+    const [existing] = await db.select().from(recurringExpenses).where(and(eq(recurringExpenses.id, id), eq(recurringExpenses.companyId, companyId))).limit(1);
+    if (!existing) throw new ActionError("El gasto recurrente ya no existe.");
+    let chargeFrom = existing.chargeFrom;
+    const scheduleChanged = existing.startDate !== input.startDate || existing.frequency !== input.frequency;
+    if (scheduleChanged && existing.lastGeneratedDate) {
+      chargeFrom = later(chargeFrom, today, addMonthsToDate(existing.lastGeneratedDate, STEP_MONTHS[existing.frequency]));
+    }
+    if (!existing.active && input.active) chargeFrom = later(chargeFrom, today);
+    await db.update(recurringExpenses).set({ ...input, chargeFrom }).where(eq(recurringExpenses.id, existing.id));
+  } else {
+    const [row] = await db.insert(recurringExpenses).values({ ...input, companyId }).returning({ id: recurringExpenses.id });
+    recurringId = row.id;
+  }
+  // Los cargos ya vencidos aparecen al momento en Movimientos.
+  const created = await generateRecurringCharges(db, companyId, today);
+  return { id: recurringId!, created };
+}
+
+/**
+ * Pausa o reanuda un gasto recurrente.
+ * Al pausar se generan antes los cargos que ya habían vencido; al reanudar, los
+ * del tiempo en pausa se descartan (el siguiente cargo es el primero desde hoy).
+ */
+export async function setRecurringActive(db: DbOrTx, companyId: string, id: string, active: boolean, today: string): Promise<void> {
+  const [existing] = await db.select().from(recurringExpenses).where(and(eq(recurringExpenses.id, id), eq(recurringExpenses.companyId, companyId))).limit(1);
+  if (!existing) throw new ActionError("El gasto recurrente ya no existe.");
+  if (existing.active === active) return;
+  if (!active) {
+    await generateRecurringCharges(db, companyId, today);
+    await db.update(recurringExpenses).set({ active: false }).where(eq(recurringExpenses.id, existing.id));
+  } else {
+    await db.update(recurringExpenses).set({ active: true, chargeFrom: later(existing.chargeFrom, today) }).where(eq(recurringExpenses.id, existing.id));
+    await generateRecurringCharges(db, companyId, today);
+  }
 }

@@ -16,6 +16,7 @@ import "server-only";
 import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import type { ActionResult, FieldErrors } from "@/lib/action";
+import { logError } from "@/server/log";
 
 /** Error de negocio con mensaje para el usuario. */
 export class ActionError extends Error {
@@ -52,7 +53,8 @@ export async function runAction<T = undefined>(
     if (error instanceof ActionError) {
       return { ok: false, error: error.message, fieldErrors: error.fieldErrors };
     }
-    console.error("[action]", error);
+    // Nunca el error en bruto: una consulta fallida arrastra sus parámetros (claves, datos personales).
+    logError("action", error);
     return { ok: false, error: "Ha ocurrido un error inesperado. Inténtalo de nuevo." };
   }
 }

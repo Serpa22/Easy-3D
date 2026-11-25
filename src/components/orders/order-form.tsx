@@ -117,7 +117,7 @@ export function OrderForm({ slug, products, customers, vatRatePct, initial }: { 
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-4 lg:grid-cols-3">
+    <form method="post" onSubmit={submit} className="grid gap-4 lg:grid-cols-3">
       <div className="flex flex-col gap-4 lg:col-span-2">
         {result && !result.ok && result.error ? (
           <p role="alert" className="rounded-md border border-danger bg-danger-dim px-3 py-2.5 text-sm">

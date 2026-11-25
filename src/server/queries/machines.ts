@@ -2,8 +2,8 @@
 import "server-only";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
-import { machineEvents, machines, maintenanceLogs, materials, printJobs, type Machine } from "@/server/db/schema";
-import { count, countWhere, sum, sumWhere } from "@/server/db/sql";
+import { machineEvents, machines, maintenanceLogs, materials, printJobs, transactions, type Machine } from "@/server/db/schema";
+import { count, countWhere, instant, sum, sumWhere } from "@/server/db/sql";
 
 export interface MachineListItem extends Machine {
   loadedMaterialName: string | null;
@@ -47,9 +47,9 @@ export async function getMachineStats(db: DbOrTx, companyId: string, machineId: 
       .select({
         completed: countWhere(sql`${printJobs.status} = 'completed'`),
         failed: countWhere(sql`${printJobs.status} = 'failed'`),
-        seconds30d: sumWhere(printJobs.durationSec, sql`${printJobs.startedAt} >= ${since30d}`),
-        monthKwh: sumWhere(printJobs.energyKwh, sql`${printJobs.startedAt} >= ${monthStart}`),
-        monthEnergyCents: sumWhere(printJobs.energyCostCents, sql`${printJobs.startedAt} >= ${monthStart}`),
+        seconds30d: sumWhere(printJobs.durationSec, sql`${printJobs.startedAt} >= ${instant(since30d)}`),
+        monthKwh: sumWhere(printJobs.energyKwh, sql`${printJobs.startedAt} >= ${instant(monthStart)}`),
+        monthEnergyCents: sumWhere(printJobs.energyCostCents, sql`${printJobs.startedAt} >= ${instant(monthStart)}`),
       })
       .from(printJobs)
       .where(scope),
@@ -130,3 +130,13 @@ export async function countMachines(db: DbOrTx, companyId: string): Promise<numb
 }
 
 export { gte };
+
+/** ¿La compra de la máquina está apuntada como gasto en Finanzas? */
+export async function hasMachinePurchaseExpense(db: DbOrTx, companyId: string, machineId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(and(eq(transactions.companyId, companyId), eq(transactions.sourceType, "machine"), eq(transactions.sourceId, machineId)))
+    .limit(1);
+  return Boolean(row);
+}

@@ -11,7 +11,9 @@ import WebSocket from "ws";
 import type { PrinterState } from "../../../lib/domain";
 import type { PrinterTelemetry } from "../../../lib/telemetry";
 import type { AdapterFactory } from "../types";
+import { isBlockedHost, parseTarget } from "../../../lib/net-target";
 import { arr, backoffMs, num, obj, str, titleFromFile } from "./_shared";
+import { describeError } from "./_http";
 
 const PAUSED = new Set([5, 6]);
 const STOPPED = new Set([0, 7, 8]);
@@ -107,8 +109,12 @@ function discover(host: string, timeoutMs = 3000): Promise<{ mainboardId?: strin
   });
 }
 
+const INVALID_ADDRESS = "La dirección de la impresora no es válida. Revísala en los ajustes de la máquina.";
+
 export const createAdapter: AdapterFactory = (ctx) => {
-  const host = str(ctx.config.host);
+  const rawHost = str(ctx.config.host, 300);
+  const parsed = parseTarget(rawHost);
+  const host = parsed && !isBlockedHost(parsed.host) ? parsed.host : undefined;
   let mainboardId = str(ctx.config.mainboardId, 80);
   let firmware: string | undefined;
   let ws: WebSocket | undefined;
@@ -134,7 +140,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
     if (stopped || retry) return;
     retry = setTimeout(() => {
       retry = undefined;
-      void connect();
+      void connect().catch(() => scheduleReconnect());
     }, backoffMs(attempt++));
   };
 
@@ -146,7 +152,12 @@ export const createAdapter: AdapterFactory = (ctx) => {
       firmware = found.firmware ?? firmware;
     }
     if (stopped) return;
-    const socket = new WebSocket(`ws://${host}:3030/websocket`, { handshakeTimeout: 8000 });
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(`ws://${host}:3030/websocket`, { handshakeTimeout: 8000 });
+    } catch {
+      return offline(INVALID_ADDRESS);
+    }
     ws = socket;
     socket.on("open", () => {
       attempt = 0;
@@ -174,7 +185,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
       if (str(attributes.FirmwareVersion)) firmware = str(attributes.FirmwareVersion, 40);
       if (msg.Status && typeof msg.Status === "object") ctx.onTelemetry(mapSdcp(msg.Status, firmware));
     });
-    socket.on("error", (error) => ctx.log("warn", `WebSocket: ${error.message}`));
+    socket.on("error", (error) => ctx.log("warn", `WebSocket: ${describeError(error)}`));
     socket.on("close", () => {
       if (ws === socket) ws = undefined;
       if (stopped) return;
@@ -185,9 +196,10 @@ export const createAdapter: AdapterFactory = (ctx) => {
 
   return {
     start() {
-      if (!host) return offline("Falta la dirección IP de la impresora.");
+      if (!rawHost) return offline("Falta la dirección IP de la impresora.");
+      if (!host) return offline(INVALID_ADDRESS);
       offline();
-      void connect();
+      void connect().catch(() => scheduleReconnect());
       poll = setInterval(() => {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         if (Date.now() - lastMessageAt > 45_000) return ws.terminate();

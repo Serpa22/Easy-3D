@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { recurringExpenses, transactions } from "@/server/db/schema";
-import { generateRecurringCharges, monthlyEquivalentCents, nextChargeDate, pendingChargeDates } from "@/server/domain/recurring";
+import { generateRecurringCharges, monthlyEquivalentCents, nextChargeDate, pendingChargeDates, saveRecurring, setRecurringActive } from "@/server/domain/recurring";
 import { freshDb, makeCompany } from "../helpers/db";
 
 beforeEach(async () => {
@@ -69,5 +69,56 @@ describe("gastos recurrentes", () => {
     await db.delete(transactions).where(eq(transactions.date, "2026-10-15"));
     expect(await generateRecurringCharges(db, company.id, "2026-12-25")).toBe(0);
     expect(await db.select().from(transactions).where(eq(transactions.companyId, company.id))).toHaveLength(3);
+  });
+
+  it("al reanudar un gasto en pausa no se cobran los meses parados", async () => {
+    const db = await getDb();
+    const company = await makeCompany();
+    const input = { name: "Trastero", category: "rent", amountCents: 9000, vatRatePct: 21, frequency: "monthly" as const, startDate: "2026-01-05", endDate: null, counterparty: null, active: true };
+    const { id } = await saveRecurring(db, company.id, null, input, "2026-03-04");
+    const dates = async () => (await db.select().from(transactions).where(eq(transactions.companyId, company.id))).map((t) => t.date).sort();
+    expect(await dates()).toEqual(["2026-01-05", "2026-02-05"]);
+
+    // Se pausa el 10 de marzo: el cargo del día 5, que ya había vencido, se genera antes de pausar.
+    await setRecurringActive(db, company.id, id, false, "2026-03-10");
+    expect(await dates()).toEqual(["2026-01-05", "2026-02-05", "2026-03-05"]);
+    expect(await generateRecurringCharges(db, company.id, "2026-08-09")).toBe(0);
+
+    // Se reanuda el 10 de agosto: ni abril, ni mayo, ni junio, ni julio, ni el 5 de agosto.
+    await setRecurringActive(db, company.id, id, true, "2026-08-10");
+    expect(await dates()).toEqual(["2026-01-05", "2026-02-05", "2026-03-05"]);
+    expect(await generateRecurringCharges(db, company.id, "2026-09-06")).toBe(1);
+    expect(await dates()).toEqual(["2026-01-05", "2026-02-05", "2026-03-05", "2026-09-05"]);
+
+    // Lo mismo si se reactiva desde el formulario de edición.
+    await setRecurringActive(db, company.id, id, false, "2026-09-10");
+    await saveRecurring(db, company.id, id, { ...input, active: true }, "2026-12-20");
+    expect(await dates()).toEqual(["2026-01-05", "2026-02-05", "2026-03-05", "2026-09-05"]);
+    // Reanudar el mismo día del cargo sí lo cobra.
+    await setRecurringActive(db, company.id, id, false, "2026-12-21");
+    await setRecurringActive(db, company.id, id, true, "2027-01-05");
+    expect((await dates()).at(-1)).toBe("2027-01-05");
+  });
+
+  it("cambiar la fecha de inicio no cobra dos veces un periodo ya cargado", async () => {
+    const db = await getDb();
+    const company = await makeCompany();
+    const input = { name: "Slicer", category: "software", amountCents: 1299, vatRatePct: 21, frequency: "monthly" as const, startDate: "2026-11-01", endDate: null, counterparty: null, active: true };
+    const { id } = await saveRecurring(db, company.id, null, input, "2026-11-25");
+    const dates = async () => (await db.select().from(transactions).where(eq(transactions.companyId, company.id))).map((t) => t.date).sort();
+    expect(await dates()).toEqual(["2026-11-01"]);
+
+    // El día real de cobro es el 15: se corrige la fecha. Noviembre ya está cobrado.
+    const edited = await saveRecurring(db, company.id, id, { ...input, startDate: "2026-10-15" }, "2026-11-25");
+    expect(edited.created).toBe(0);
+    expect(await dates()).toEqual(["2026-11-01"]);
+    await generateRecurringCharges(db, company.id, "2026-12-20");
+    expect(await dates()).toEqual(["2026-11-01", "2026-12-15"]);
+
+    // Un gasto que aún no había generado nada sí rellena hacia atrás al adelantar su inicio.
+    const future = await saveRecurring(db, company.id, null, { ...input, name: "Hosting", startDate: "2027-06-01" }, "2026-12-20");
+    expect(future.created).toBe(0);
+    const moved = await saveRecurring(db, company.id, future.id, { ...input, name: "Hosting", startDate: "2026-11-10" }, "2026-12-20");
+    expect(moved.created).toBe(2);
   });
 });

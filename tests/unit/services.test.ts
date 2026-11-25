@@ -123,6 +123,44 @@ describe("servicio de impresiones", () => {
     expect(await db.select().from(printJobs)).toHaveLength(1);
   });
 
+  it("corregir solo una nota no mueve stock, costes ni energía (aunque el stock ya se haya vendido o cambie la tarifa)", async () => {
+    const { db, company, machine, pla, product } = await setup();
+    const job = await logFinishedJob(db, company.id, logJobSchema.parse({ machineId: machine.id, name: "Bandeja 3", productId: product.id, startedAt: "2026-11-25T09:00", endedAt: "2026-11-25T11:02", status: "completed", materialUsed: "100", piecesProduced: "10" }), "Europe/Madrid", now);
+    expect(await stock(product.id)).toBe(20);
+    expect(job).toMatchObject({ durationSec: 7320, energyCostCents: 4, materialCostCents: 200 });
+
+    // Se venden 18 unidades, sube la luz y sube el precio del filamento.
+    await db.update(products).set({ stockQty: 2 }).where(eq(products.id, product.id));
+    await db.update(materials).set({ packCostCents: 4000 }).where(eq(materials.id, pla.id));
+    const { companies } = await import("@/server/db/schema");
+    await db.update(companies).set({ kwhPrice: 0.9 }).where(eq(companies.id, company.id));
+
+    const same = { jobId: job.id, name: "Bandeja 3", productId: product.id, materialId: pla.id, durationMinutes: "122", status: "completed", materialUsed: "100", piecesProduced: "10" };
+    const edited = await updateClosedJob(db, company.id, editJobSchema.parse({ ...same, notes: "Capa inicial algo fina" }), "Europe/Madrid");
+    expect(await stock(product.id)).toBe(2); // antes volvía a 10: unidades fantasma
+    expect(await matStock(pla.id)).toBe(900);
+    expect(edited).toMatchObject({ durationSec: 7320, energyKwh: job.energyKwh, energyCostCents: 4, materialCostCents: 200, notes: "Capa inicial algo fina" });
+    expect((await db.select().from(machines).where(eq(machines.id, machine.id)))[0].totalPrintSeconds).toBe(7320);
+
+    // Corregir las piezas aplica solo la diferencia (10 → 7 = −3; el stock no baja de 0).
+    await updateClosedJob(db, company.id, editJobSchema.parse({ ...same, piecesProduced: "7" }), "Europe/Madrid");
+    expect(await stock(product.id)).toBe(0);
+    await updateClosedJob(db, company.id, editJobSchema.parse({ ...same, piecesProduced: "12" }), "Europe/Madrid");
+    expect(await stock(product.id)).toBe(5);
+
+    // Cambiar la duración reescala la energía de entonces; no usa la tarifa de hoy.
+    const halved = await updateClosedJob(db, company.id, editJobSchema.parse({ ...same, piecesProduced: "12", durationMinutes: "61" }), "Europe/Madrid");
+    expect(halved.durationSec).toBe(3660);
+    expect(halved.energyKwh).toBeCloseTo(job.energyKwh / 2, 6);
+    expect(halved.energyCostCents).toBe(2);
+
+    // Si la máquina se elimina, corregir la impresión no pone su energía a cero.
+    await db.delete(machines).where(eq(machines.id, machine.id));
+    const orphan = await updateClosedJob(db, company.id, editJobSchema.parse({ ...same, piecesProduced: "12", durationMinutes: "61", notes: "sin máquina" }), "Europe/Madrid");
+    expect(orphan.energyKwh).toBeCloseTo(job.energyKwh / 2, 6);
+    expect(orphan.energyCostCents).toBe(2);
+  });
+
   it("interpreta las horas en la zona horaria de la organización y valida el orden", async () => {
     const { db, company, machine } = await setup();
     const input = (patch: Record<string, unknown>) => logJobSchema.parse({ machineId: machine.id, name: "x", startedAt: "2026-11-25T09:00", endedAt: "2026-11-25T10:00", status: "completed", ...patch });

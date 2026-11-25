@@ -10,7 +10,7 @@ import { MATERIAL_KINDS, MATERIAL_UNITS } from "@/lib/domain";
 import { zCents, zDate, zDecimal, zId, zOptionalCents, zOptionalColor, zOptionalDecimal, zOptionalId, zOptionalText, zText } from "@/lib/validation";
 import { ActionError, parseForm, parseInput, runAction } from "@/server/action";
 import { requireCompany } from "@/server/context";
-import { materialMovements, materials } from "@/server/db/schema";
+import { machines, materialMovements, materials } from "@/server/db/schema";
 import { count } from "@/server/db/sql";
 import { applyMaterialMovement, revertMaterialMovement } from "@/server/domain/stock";
 
@@ -144,12 +144,17 @@ export async function revertMovementAction(slug: string, id: string): Promise<Ac
 export async function archiveMaterialAction(slug: string, id: string, archived: boolean): Promise<ActionResult> {
   return runAction(async () => {
     const { company, db } = await requireCompany(slug);
-    const updated = await db
-      .update(materials)
-      .set({ archivedAt: archived ? new Date() : null })
-      .where(and(eq(materials.id, parseInput(zId(), id)), eq(materials.companyId, company.id)))
-      .returning({ id: materials.id });
-    if (updated.length === 0) throw new ActionError("El material ya no existe.");
+    const materialId = parseInput(zId(), id);
+    await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(materials)
+        .set({ archivedAt: archived ? new Date() : null })
+        .where(and(eq(materials.id, materialId), eq(materials.companyId, company.id)))
+        .returning({ id: materials.id });
+      if (updated.length === 0) throw new ActionError("El material ya no existe.");
+      // Un material archivado deja de estar cargado en las máquinas: no debe seguir descontándose.
+      if (archived) await tx.update(machines).set({ loadedMaterialId: null }).where(and(eq(machines.loadedMaterialId, materialId), eq(machines.companyId, company.id)));
+    });
     revalidatePath(`/e/${slug}`, "layout");
     return { message: archived ? "Material archivado" : "Material recuperado" };
   });
@@ -159,10 +164,14 @@ export async function deleteMaterialAction(slug: string, id: string): Promise<Ac
   return runAction(async () => {
     const { company, db } = await requireCompany(slug);
     const materialId = parseInput(zId(), id);
-    const [{ n }] = await db.select({ n: count() }).from(materialMovements).where(and(eq(materialMovements.materialId, materialId), eq(materialMovements.companyId, company.id)));
-    if (n > 0) throw new ActionError("Este material tiene movimientos. Archívalo para conservar su historial.");
-    const deleted = await db.delete(materials).where(and(eq(materials.id, materialId), eq(materials.companyId, company.id))).returning({ id: materials.id });
-    if (deleted.length === 0) throw new ActionError("El material ya no existe.");
+    await db.transaction(async (tx) => {
+      const [{ n }] = await tx.select({ n: count() }).from(materialMovements).where(and(eq(materialMovements.materialId, materialId), eq(materialMovements.companyId, company.id)));
+      if (n > 0) throw new ActionError("Este material tiene movimientos. Archívalo para conservar su historial.");
+      // Se descarga de las máquinas que lo tuvieran puesto (la clave foránea también lo garantiza).
+      await tx.update(machines).set({ loadedMaterialId: null }).where(and(eq(machines.loadedMaterialId, materialId), eq(machines.companyId, company.id)));
+      const deleted = await tx.delete(materials).where(and(eq(materials.id, materialId), eq(materials.companyId, company.id))).returning({ id: materials.id });
+      if (deleted.length === 0) throw new ActionError("El material ya no existe.");
+    });
     revalidatePath(`/e/${slug}`, "layout");
     redirect(`/e/${slug}/materiales`);
   });

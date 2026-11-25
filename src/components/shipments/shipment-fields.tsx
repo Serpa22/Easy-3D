@@ -15,18 +15,24 @@ export function ShipmentFields({
   shipment,
   orders,
   defaults,
+  currentOrderNumber,
 }: {
   shipment?: Shipment;
   orders: ShipmentOrderOption[];
   defaults?: { orderId?: string; recipientName?: string | null; destination?: string | null };
+  /** Número del pedido ya vinculado, por si no está en la lista (devuelto, cancelado o antiguo). */
+  currentOrderNumber?: string | null;
 }) {
   const known = CARRIERS.some((c) => c.id === shipment?.carrier);
+  // El pedido vinculado siempre aparece como opción: guardar el formulario no debe desvincularlo.
+  const linkedMissing = shipment?.orderId && !orders.some((o) => o.id === shipment.orderId) ? shipment.orderId : null;
   return (
     <>
       {shipment ? <input type="hidden" name="id" value={shipment.id} /> : null}
       <Field label="Pedido" name="orderId" hint="Opcional. Al enviarlo, el pedido pasará a «Enviado».">
         <Select defaultValue={shipment?.orderId ?? defaults?.orderId ?? ""}>
           <option value="">Sin pedido asociado</option>
+          {linkedMissing ? <option value={linkedMissing}>{currentOrderNumber ?? "Pedido actual"}</option> : null}
           {orders.map((o) => (
             <option key={o.id} value={o.id}>
               {o.number} · {o.customerName}

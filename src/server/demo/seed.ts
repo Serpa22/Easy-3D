@@ -8,7 +8,7 @@
  * (misma fecha → mismos datos) e idempotente (no duplica si ya existen).
  */
 import "server-only";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, type Db, type Tx } from "@/server/db";
 import {
   companies,
@@ -41,6 +41,7 @@ import { applyMaterialMovement } from "@/server/domain/stock";
 import { getOrgSettings } from "@/server/settings";
 
 /** Marca que identifica a las empresas creadas por el generador (para poder borrarlas con seguridad). */
+/** Texto descriptivo de las empresas de ejemplo. Solo informa: lo que las identifica es `companies.demoKey`. */
 export const DEMO_MARKER = "Empresa de demostración.";
 export const DEMO_SLUGS = ["teclas", "figuras"] as const;
 
@@ -268,13 +269,21 @@ async function isEmptyCompany(db: Db | Tx, companyId: string): Promise<boolean> 
 
 async function seedCompany(tx: Tx, spec: CompanySpec, today: string, timeZone: string): Promise<void> {
   const rng = mulberry32(spec.seed);
-  const [existing] = await tx.select().from(companies).where(eq(companies.slug, spec.slug)).limit(1);
+  // Solo se reutiliza una empresa que este mismo generador creó (marcada con `demoKey`).
+  // Nunca se adopta una empresa real, aunque se llame igual y esté vacía.
+  const [existing] = await tx.select().from(companies).where(eq(companies.demoKey, spec.slug)).limit(1);
   if (existing && !(await isEmptyCompany(tx, existing.id))) return;
 
-  const base: Company = existing ?? (await createCompany(tx, { name: spec.name, activity: spec.activity }));
+  let base: Company | undefined = existing;
+  if (!base) {
+    // Si ya hay una empresa real con ese nombre, la de ejemplo se distingue en el nombre (y en la URL).
+    const [taken] = await tx.select({ id: companies.id }).from(companies).where(eq(companies.slug, spec.slug)).limit(1);
+    base = await createCompany(tx, { name: taken ? `${spec.name} (ejemplo)` : spec.name, activity: spec.activity });
+  }
   const [company] = await tx
     .update(companies)
     .set({
+      demoKey: spec.slug,
       activity: base.activity ?? spec.activity,
       description: DEMO_MARKER,
       monogram: spec.monogram,
@@ -674,12 +683,12 @@ export async function seedDemoData(): Promise<void> {
   }
 }
 
-/** Borra las empresas de demostración (solo las marcadas por el generador). */
+/**
+ * Borra las empresas de demostración: únicamente las que creó el generador
+ * (`demoKey`). El nombre, la URL o la descripción de una empresa no cuentan.
+ */
 export async function removeDemoData(): Promise<number> {
   const db = await getDb();
-  const rows = await db
-    .delete(companies)
-    .where(and(inArray(companies.slug, [...DEMO_SLUGS]), eq(companies.description, DEMO_MARKER)))
-    .returning({ id: companies.id });
+  const rows = await db.delete(companies).where(isNotNull(companies.demoKey)).returning({ id: companies.id });
   return rows.length;
 }

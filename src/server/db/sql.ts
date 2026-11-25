@@ -25,3 +25,14 @@ export function countWhere(condition: SQL): SQL<number> {
 export function monthKey(col: AnyColumn): SQL<string> {
   return sql<string>`to_char(${col}, 'YYYY-MM')`;
 }
+
+/**
+ * Un instante (`Date`) como parámetro dentro de una plantilla sql``.
+ *
+ * Fuera de `eq()/gte()/lt()` Drizzle no sabe a qué columna pertenece el valor y
+ * no lo convierte: PGlite lo acepta, pero postgres-js falla con un `Date` suelto.
+ * Usa siempre este atajo (o los operadores de Drizzle) para comparar instantes.
+ */
+export function instant(date: Date): SQL {
+  return sql`${date.toISOString()}::timestamptz`;
+}

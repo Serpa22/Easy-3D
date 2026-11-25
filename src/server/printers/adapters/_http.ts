@@ -1,5 +1,6 @@
 /** Sondeo HTTP con clave API o autenticación Digest (PrusaLink), para adaptadores REST. */
 import { createHash, randomBytes } from "node:crypto";
+import { httpBaseOf, isBlockedHost, parseTarget } from "../../../lib/net-target";
 
 const md5 = (text: string) => createHash("md5").update(text).digest("hex");
 
@@ -37,31 +38,43 @@ export class HttpError extends Error {
   }
 }
 
-/** GET que devuelve JSON (o null con 204). Lanza HttpError con el código si no es 2xx. */
+/**
+ * GET que devuelve JSON (o null con 204). Lanza HttpError con el código si no es 2xx.
+ *
+ * No sigue redirecciones: una impresora no redirige, y seguirlas permitiría que
+ * una dirección ajena desviara la petición (y la clave) hacia otro servicio.
+ */
 export async function getJson(base: string, path: string, auth: HttpAuth, timeoutMs = 8000): Promise<unknown> {
   const url = `${base}${path}`;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (auth.apiKey) headers["X-Api-Key"] = auth.apiKey;
-  let res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+  let res = await fetch(url, { headers, redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
   if (res.status === 401 && auth.username && auth.password) {
     const challenge = res.headers.get("www-authenticate") ?? "";
     const header = /^digest/i.test(challenge) ? digestHeader(challenge, "GET", path, auth.username, auth.password) : null;
-    if (header) res = await fetch(url, { headers: { ...headers, Authorization: header }, signal: AbortSignal.timeout(timeoutMs) });
+    if (header) res = await fetch(url, { headers: { ...headers, Authorization: header }, redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
   }
   if (res.status === 204) return null;
   if (!res.ok) throw new HttpError(res.status, `HTTP ${res.status}`);
   return res.json();
 }
 
-/** Normaliza «192.168.1.70», «192.168.1.70:5000» o «http://…/» a una URL base sin barra final. */
+/**
+ * Normaliza «192.168.1.70», «192.168.1.70:5000» o «http://…/octoprint/» a una URL base
+ * sin barra final. Devuelve undefined si la dirección no es válida o no está permitida.
+ */
 export function baseUrl(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const withScheme = /^https?:\/\//i.test(value) ? value : `http://${value}`;
-  try {
-    const url = new URL(withScheme);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}`;
-  } catch {
-    return undefined;
-  }
+  const target = parseTarget(value, { scheme: true, port: true, path: true });
+  if (!target || isBlockedHost(target.host)) return undefined;
+  return httpBaseOf(target);
+}
+
+/** Texto corto y sin datos del servidor remoto para el registro (nunca el cuerpo de la respuesta). */
+export function describeError(error: unknown): string {
+  if (error instanceof HttpError) return `HTTP ${error.status}`;
+  if (error instanceof SyntaxError) return "respuesta no válida";
+  const e = error as { name?: string; code?: string; cause?: { code?: string } } | null;
+  if (e?.name === "TimeoutError" || e?.name === "AbortError") return "sin respuesta (tiempo agotado)";
+  const code = e?.cause?.code ?? e?.code;
+  return typeof code === "string" && /^[A-Z_0-9]{3,40}$/.test(code) ? code : "error de red";
 }

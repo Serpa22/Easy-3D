@@ -28,25 +28,36 @@ export async function notifyMachineChanged(machineId?: string): Promise<void> {
   await syncEmbeddedPrinters();
 }
 
-/** Prueba una conexión sin guardarla: conecta, espera la primera telemetría y desconecta. */
+/**
+ * Prueba una conexión sin guardarla: conecta, espera la primera telemetría y desconecta.
+ *
+ * Los mensajes que devuelve son siempre textos fijos: nunca el error en bruto ni
+ * fragmentos de la respuesta remota, para que la prueba no sirva para leer
+ * servicios internos de la red del servidor.
+ */
 export async function testConnection(
   type: ConnectionType,
   config: Record<string, unknown>,
   meta?: { technology?: string },
 ): Promise<ConnectionTestResult> {
   if (type === "none") return { ok: false, message: "Esta máquina no tiene conexión configurada." };
+  if (!embeddedEnabled()) {
+    return {
+      ok: false,
+      message: "Esta instalación no se conecta directamente a las impresoras: lo hace el bridge del taller. Guarda la máquina y comprueba su estado en directo.",
+    };
+  }
   let adapter: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof loadAdapter>>>>> | undefined;
   try {
     const factory = await loadAdapter(type);
     if (!factory) return { ok: false, message: "Tipo de conexión no disponible." };
-    let lastLog = "";
+    // Solo mensajes que redacta el propio adaptador (credenciales rechazadas, dirección no válida…).
     let lastError = "";
     const result = await new Promise<ConnectionTestResult>((resolve) => {
       const timeout = setTimeout(() => {
-        const detail = lastError || lastLog;
         resolve({
           ok: false,
-          message: `No se ha recibido respuesta de la impresora en 8 s.${detail ? ` ${detail}` : " Comprueba la dirección, que esté encendida y en la misma red."}`,
+          message: `No se ha recibido respuesta de la impresora en 8 s. ${lastError || "Comprueba la dirección, que esté encendida y en la misma red."}`,
         });
       }, 8000);
       adapter = factory({
@@ -62,15 +73,14 @@ export async function testConnection(
           clearTimeout(timeout);
           resolve({ ok: true, message: `Conexión correcta. Estado: ${PRINTER_STATE_LABELS[telemetry.state].toLowerCase()}.`, telemetry });
         },
-        log: (level, message) => {
-          if (level !== "info") lastLog = message;
-        },
+        log: () => {},
       });
       adapter.start();
     });
     return result;
   } catch (error) {
-    return { ok: false, message: `No se pudo probar la conexión: ${error instanceof Error ? error.message : String(error)}` };
+    console.error("[impresoras] prueba de conexión", error instanceof Error ? error.name : "error");
+    return { ok: false, message: "No se pudo probar la conexión. Revisa los datos e inténtalo de nuevo." };
   } finally {
     await adapter?.stop().catch(() => {});
   }

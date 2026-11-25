@@ -8,6 +8,13 @@
       "when": 1795599985725,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795626078323,
+      "tag": "0001_stock_demo_fk",
+      "breakpoints": true
     }
   ]
 }

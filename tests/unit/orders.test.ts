@@ -93,6 +93,22 @@ describe("pedidos", () => {
     expect(await stock()).toBe(10);
   });
 
+  it("si no hay stock suficiente descuenta lo que hay y al cancelar devuelve exactamente eso", async () => {
+    const { db, company, product, order } = await setup();
+    const stock = async () => (await db.select().from(products).where(eq(products.id, product.id)))[0].stockQty;
+    await db.update(products).set({ stockQty: 1 }).where(eq(products.id, product.id));
+
+    await db.update(orders).set({ status: "shipped" }).where(eq(orders.id, order.id));
+    await syncOrderEffects(db, company.id, order.id);
+    expect(await stock()).toBe(0); // pedía 2 y solo había 1
+    expect((await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)))[0].stockDeductedQty).toBe(1);
+
+    await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, order.id));
+    await syncOrderEffects(db, company.id, order.id);
+    expect(await stock()).toBe(1); // antes volvía a 2: una unidad fantasma
+    expect((await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)))[0].stockDeductedQty).toBe(0);
+  });
+
   it("permite cambiar las líneas de un pedido enviado sin descuadrar el stock", async () => {
     const { db, company, product, order } = await setup();
     const stock = async () => (await db.select().from(products).where(eq(products.id, product.id)))[0].stockQty;

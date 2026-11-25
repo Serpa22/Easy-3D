@@ -3,7 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { companies, machines, materials, orders, printJobs, products, shipments, transactions } from "@/server/db/schema";
 import { count, sum } from "@/server/db/sql";
-import { removeDemoData, seedDemoData } from "@/server/demo/seed";
+import { DEMO_MARKER, removeDemoData, seedDemoData } from "@/server/demo/seed";
 import { createCompany } from "@/server/domain/companies";
 import { todayISO } from "@/lib/dates";
 import { freshDb } from "../../helpers/db";
@@ -64,16 +64,34 @@ describe("datos de demostración", () => {
     expect(await snapshot()).toEqual(first);
   }, 240_000);
 
-  it("solo borra las empresas marcadas como demostración", async () => {
+  it("nunca adopta ni borra una empresa real, aunque se llame igual, esté vacía o copie la descripción", async () => {
     await freshDb();
     const db = await getDb();
-    // Una empresa real llamada «Figuras» con datos propios no se toca.
-    const real = await createCompany(db, { name: "Figuras" });
-    await db.insert(machines).values({ companyId: real.id, name: "Mi impresora" });
+    // Empresa real «Figuras» con datos, y empresa real «Teclas» recién creada (vacía),
+    // a la que además alguien le ha copiado la descripción de las de ejemplo.
+    const figuras = await createCompany(db, { name: "Figuras" });
+    await db.insert(machines).values({ companyId: figuras.id, name: "Mi impresora" });
+    const teclas = await createCompany(db, { name: "Teclas", description: DEMO_MARKER });
+
     await seedDemoData();
-    expect(await removeDemoData()).toBe(1);
+    const all = await db.select().from(companies);
+    expect(all.map((c) => [c.slug, c.demoKey]).sort()).toEqual([
+      ["figuras", null],
+      ["figuras-ejemplo", "figuras"],
+      ["teclas", null],
+      ["teclas-ejemplo", "teclas"],
+    ]);
+    // Las reales siguen intactas: ningún pedido de ejemplo se ha mezclado en ellas.
+    expect(await db.select().from(orders).where(eq(orders.companyId, teclas.id))).toHaveLength(0);
+    expect(await db.select().from(orders).where(eq(orders.companyId, figuras.id))).toHaveLength(0);
+
+    // Volver a generar no duplica las de ejemplo.
+    await seedDemoData();
+    expect(await db.select().from(companies)).toHaveLength(4);
+
+    expect(await removeDemoData()).toBe(2);
     const left = await db.select().from(companies);
-    expect(left.map((c) => c.slug)).toEqual(["figuras"]);
-    expect((await db.select().from(machines).where(and(eq(machines.companyId, real.id)))).length).toBe(1);
+    expect(left.map((c) => c.slug).sort()).toEqual(["figuras", "teclas"]);
+    expect((await db.select().from(machines).where(and(eq(machines.companyId, figuras.id)))).length).toBe(1);
   }, 240_000);
 });

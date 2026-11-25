@@ -1,5 +1,10 @@
 /**
  * Existencias de material: todo cambio de stock pasa por un movimiento.
+ *
+ * El stock es SIEMPRE la suma exacta de sus movimientos, así que puede quedar en
+ * negativo (se ha consumido más de lo que consta comprado). No se recorta a 0:
+ * recortar perdería información y al deshacer o corregir un movimiento el stock
+ * dejaría de cuadrar. La interfaz avisa cuando un material está en negativo.
  */
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
@@ -73,7 +78,7 @@ export async function applyMaterialMovement(tx: DbOrTx, input: MovementInput): P
   }
   const [updated] = await tx
     .update(materials)
-    .set({ ...patch, stockQty: sql`greatest(${materials.stockQty} + ${qty}, 0)` })
+    .set({ ...patch, stockQty: sql`${materials.stockQty} + ${qty}` })
     .where(eq(materials.id, material.id))
     .returning();
 
@@ -106,7 +111,7 @@ export async function revertMaterialMovement(tx: DbOrTx, companyId: string, move
   if (!movement) throw new ActionError("El movimiento no existe.");
   await tx
     .update(materials)
-    .set({ stockQty: sql`greatest(${materials.stockQty} - ${movement.qty}, 0)` })
+    .set({ stockQty: sql`${materials.stockQty} - ${movement.qty}` })
     .where(and(eq(materials.id, movement.materialId), eq(materials.companyId, companyId)));
   await removeLedgerEntry(tx, { companyId, sourceType: "material_purchase", sourceId: movement.id });
   await tx.delete(materialMovements).where(eq(materialMovements.id, movement.id));

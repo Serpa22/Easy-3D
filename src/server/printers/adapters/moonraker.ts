@@ -7,7 +7,9 @@ import WebSocket from "ws";
 import type { PrinterState } from "../../../lib/domain";
 import type { PrinterTelemetry } from "../../../lib/telemetry";
 import type { AdapterFactory } from "../types";
+import { isBlockedHost, parseTarget } from "../../../lib/net-target";
 import { arr, backoffMs, deepMerge, num, obj, str, titleFromFile } from "./_shared";
+import { describeError } from "./_http";
 
 export interface MoonrakerMeta {
   estimated_time?: number;
@@ -132,11 +134,17 @@ export function mapMoonraker(S: Record<string, unknown>, meta: MoonrakerMeta | u
   return out;
 }
 
+const INVALID_ADDRESS = "La dirección de la impresora no es válida. Revísala en los ajustes de la máquina.";
+
 export const createAdapter: AdapterFactory = (ctx) => {
-  const rawHost = (str(ctx.config.host) ?? "").replace(/^(https?|wss?):\/\//i, "").replace(/\/+$/, "");
-  const secure = /^(https|wss):\/\//i.test(str(ctx.config.host) ?? "");
-  const hasPort = /:\d+$/.test(rawHost);
-  const authority = hasPort ? rawHost : `${rawHost}:${num(ctx.config.port) ?? 7125}`;
+  const rawHost = str(ctx.config.host, 300) ?? "";
+  // Solo «IP o nombre[:puerto]»: cualquier otra cosa no llega ni a fetch ni al WebSocket.
+  const parsed = parseTarget(rawHost.replace(/\/+$/, ""), { scheme: true, port: true });
+  const target = parsed && !isBlockedHost(parsed.host) ? parsed : undefined;
+  const configPort = num(ctx.config.port);
+  const port = target?.port ?? (configPort !== undefined && Number.isInteger(configPort) && configPort >= 1 && configPort <= 65535 ? configPort : 7125);
+  const secure = target?.secure ?? false;
+  const authority = target ? `${target.host}:${port}` : "";
   const httpBase = `${secure ? "https" : "http"}://${authority}`;
   const apiKey = str(ctx.config.apiKey);
 
@@ -246,7 +254,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
     if (stopped || retry) return;
     retry = setTimeout(() => {
       retry = undefined;
-      void connect();
+      void connect().catch(() => scheduleReconnect());
     }, backoffMs(attempt++));
   };
 
@@ -256,7 +264,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
     try {
       if (apiKey) {
         // Con clave API se pide un token de un solo uso para abrir el WebSocket.
-        const res = await fetch(`${httpBase}/access/oneshot_token`, { headers: { "X-Api-Key": apiKey }, signal: AbortSignal.timeout(8000) });
+        const res = await fetch(`${httpBase}/access/oneshot_token`, { headers: { "X-Api-Key": apiKey }, redirect: "error", signal: AbortSignal.timeout(8000) });
         if (res.status === 401 || res.status === 403) {
           offline("Moonraker ha rechazado la clave API.");
           return scheduleReconnect();
@@ -268,12 +276,18 @@ export const createAdapter: AdapterFactory = (ctx) => {
       return scheduleReconnect();
     }
     if (stopped) return;
-    const socket = new WebSocket(url, { handshakeTimeout: 10_000 });
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url, { handshakeTimeout: 10_000 });
+    } catch {
+      // Dirección imposible de abrir: no tiene sentido reintentar hasta que se corrija.
+      return offline(INVALID_ADDRESS);
+    }
     ws = socket;
     socket.on("open", () => {
       attempt = 0;
       init().catch((error) => {
-        ctx.log("warn", `No se pudo iniciar la sesión: ${error instanceof Error ? error.message : String(error)}`);
+        ctx.log("warn", `No se pudo iniciar la sesión: ${describeError(error)}`);
         socket.terminate();
       });
     });
@@ -322,7 +336,7 @@ export const createAdapter: AdapterFactory = (ctx) => {
     socket.on("unexpected-response", (_req, res) => {
       if (res.statusCode === 401 || res.statusCode === 403) offline("Moonraker requiere una clave API válida.");
     });
-    socket.on("error", (error) => ctx.log("warn", `WebSocket: ${error.message}`));
+    socket.on("error", (error) => ctx.log("warn", `WebSocket: ${describeError(error)}`));
     socket.on("close", () => {
       for (const done of pending.values()) done(undefined, { message: "conexión cerrada" });
       pending.clear();
@@ -336,8 +350,9 @@ export const createAdapter: AdapterFactory = (ctx) => {
   return {
     start() {
       if (!rawHost) return offline("Falta la dirección de Moonraker.");
+      if (!target) return offline(INVALID_ADDRESS);
       offline();
-      void connect();
+      void connect().catch(() => scheduleReconnect());
       ping = setInterval(() => {
         if (ws?.readyState === WebSocket.OPEN) ws.ping();
       }, 20_000);

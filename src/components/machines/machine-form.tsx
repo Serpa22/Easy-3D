@@ -130,7 +130,12 @@ export function MachineForm({ slug, values = {}, materials, bridges, onDone, onC
             <DateInput defaultValue={values.purchaseDate ?? ""} />
           </Field>
         </div>
-        <Checkbox name="registerPurchase" defaultChecked={values.registerPurchase} label="Registrar la compra como gasto en Finanzas" hint="Necesita precio y fecha de compra." />
+        <Checkbox
+          name="registerPurchase"
+          defaultChecked={values.registerPurchase}
+          label="Registrar la compra como gasto en Finanzas"
+          hint={values.registerPurchase ? "Ya está apuntada en Finanzas. Si desmarcas la casilla, el gasto se elimina." : "Necesita precio y fecha de compra."}
+        />
       </Group>
 
       <Group title="Conexión en directo" description="Conecta la impresora para ver su estado, la pieza que imprime y sus eventos en tiempo real.">
@@ -163,21 +168,23 @@ export function MachineForm({ slug, values = {}, materials, bridges, onDone, onC
               const saved = sameType && values.connection?.[`__has_${field.key}`] === true;
               const current = sameType ? values.connection?.[field.key] : undefined;
               return (
-                <Field
-                  key={`${type}-${field.key}`}
-                  label={field.label}
-                  name={`conn_${field.key}`}
-                  required={field.required && !saved}
-                  hint={field.secret && saved ? "Guardada. Déjalo vacío para conservarla." : field.help}
-                >
-                  <Input
-                    type={field.type === "password" ? "password" : "text"}
-                    inputMode={field.type === "number" ? "decimal" : undefined}
-                    autoComplete="off"
-                    placeholder={field.secret && saved ? "••••••••" : field.placeholder}
-                    defaultValue={field.secret ? "" : current !== undefined ? String(current) : field.defaultValue !== undefined ? String(field.defaultValue) : ""}
-                  />
-                </Field>
+                <div key={`${type}-${field.key}`} className="flex flex-col gap-2">
+                  <Field
+                    label={field.label}
+                    name={`conn_${field.key}`}
+                    required={field.required && !saved}
+                    hint={field.secret && saved ? "Guardada. Déjalo vacío para conservarla; si cambias la dirección tendrás que escribirla de nuevo." : field.help}
+                  >
+                    <Input
+                      type={field.type === "password" ? "password" : "text"}
+                      inputMode={field.type === "number" ? "decimal" : undefined}
+                      autoComplete="off"
+                      placeholder={field.secret && saved ? "••••••••" : field.placeholder}
+                      defaultValue={field.secret ? "" : current !== undefined ? String(current) : field.defaultValue !== undefined ? String(field.defaultValue) : ""}
+                    />
+                  </Field>
+                  {field.secret && saved && !field.required ? <Checkbox name={`conn_${field.key}__clear`} label="Quitar el dato guardado" /> : null}
+                </div>
               );
             })}
           </div>
@@ -207,7 +214,11 @@ export function MachineForm({ slug, values = {}, materials, bridges, onDone, onC
                 startTest(async () => {
                   const res = await testConnectionAction(slug, data);
                   if (res.ok && res.data) setTest({ ok: res.data.ok, message: res.data.message });
-                  else if (!res.ok) setTest({ ok: false, message: res.error ?? "No se pudo probar la conexión." });
+                  else if (!res.ok) {
+                    // Si falla la validación, se muestra el primer campo con problema.
+                    const detail = Object.values(res.fieldErrors ?? {})[0];
+                    setTest({ ok: false, message: [res.error ?? "No se pudo probar la conexión.", detail].filter(Boolean).join(" ") });
+                  }
                 });
               }}
             >

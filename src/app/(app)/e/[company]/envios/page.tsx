@@ -124,7 +124,7 @@ export default async function ShipmentsPage({ params, searchParams }: { params: 
           if (s.status === "pending" || s.status === "label_created") items.push({ type: "action", label: "Marcar enviado", icon: <Send />, action: setShipmentStatusAction.bind(null, slug, s.id, "in_transit") });
           if (s.status !== "delivered" && s.status !== "returned") items.push({ type: "action", label: "Marcar entregado", icon: <CheckCircle2 />, action: setShipmentStatusAction.bind(null, slug, s.id, "delivered") });
           if (s.status !== "incident" && s.status !== "delivered" && s.status !== "returned") items.push({ type: "action", label: "Marcar incidencia", icon: <AlertTriangle />, action: setShipmentStatusAction.bind(null, slug, s.id, "incident") });
-          items.push({ type: "form", label: "Editar", icon: <Pencil />, title: "Editar envío", dialogSize: "lg", action: save, content: <ShipmentFields shipment={s} orders={orderOptions} /> });
+          items.push({ type: "form", label: "Editar", icon: <Pencil />, title: "Editar envío", dialogSize: "lg", action: save, content: <ShipmentFields shipment={s} orders={orderOptions} currentOrderNumber={orderNumber} /> });
           items.push({ type: "separator" });
           items.push({ type: "confirm", label: "Eliminar", icon: <Trash2 />, danger: true, title: "¿Eliminar este envío?", description: "También se eliminará su gasto en Finanzas. El pedido no cambia de estado.", action: deleteShipmentAction.bind(null, slug, s.id) });
           return {
