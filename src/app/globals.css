@@ -1,0 +1,236 @@
+@import "tailwindcss";
+@import "./styles/kit-forms.css";
+@import "./styles/kit-display.css";
+@import "./styles/charts.css";
+
+/* ------------------------------------------------------------------
+   Easy 3D — sistema de diseño monocromo (negro / blanco)
+
+   - Tema oscuro por defecto; el claro se activa con <html data-theme="light">.
+   - TODO color sale de estos tokens. No existen utilidades de color
+     de Tailwind fuera de las declaradas en @theme (text-blue-500 no existe).
+   - Los colores de estado (ok / warn / danger) son la ÚNICA excepción al
+     monocromo y se reservan para señalar estado, siempre con icono o texto.
+------------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+
+  /* superficies */
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --elevated: #141414;
+  --hover: #1c1c1c;
+  --active: #262626;
+
+  /* líneas */
+  --border: rgba(255, 255, 255, 0.1); /* divisores decorativos */
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-control: #6b6b6b; /* bordes de controles: ≥3:1 sobre el fondo */
+
+  /* texto */
+  --text: #fafafa;
+  --text-2: #a8a8a8;
+  --text-3: #8c8c8c;
+
+  /* acción principal: inverso del fondo */
+  --primary: #fafafa;
+  --primary-hover: #e4e4e4;
+  --primary-active: #cfcfcf;
+  --primary-fg: #0a0a0a;
+
+  /* estado (reservado) */
+  --ok: #46d28a;
+  --ok-dim: rgba(70, 210, 138, 0.14);
+  --warn: #f2b84b;
+  --warn-dim: rgba(242, 184, 75, 0.14);
+  --danger: #ff6b6b;
+  --danger-dim: rgba(255, 107, 107, 0.14);
+
+  /* foco */
+  --ring: #fafafa;
+
+  /* overlay de modales */
+  --scrim: rgba(0, 0, 0, 0.72);
+
+  /* sombras */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  /* movimiento */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --elevated: #ffffff;
+  --hover: #f1f1f1;
+  --active: #e6e6e6;
+
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.2);
+  --border-control: #858585;
+
+  --text: #0a0a0a;
+  --text-2: #525252;
+  --text-3: #6b6b6b;
+
+  --primary: #0a0a0a;
+  --primary-hover: #262626;
+  --primary-active: #3a3a3a;
+  --primary-fg: #fafafa;
+
+  --ok: #157a4a;
+  --ok-dim: rgba(21, 122, 74, 0.1);
+  --warn: #9a5b00;
+  --warn-dim: rgba(154, 91, 0, 0.1);
+  --danger: #c92a2a;
+  --danger-dim: rgba(201, 42, 42, 0.09);
+
+  --ring: #0a0a0a;
+  --scrim: rgba(0, 0, 0, 0.4);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+@theme inline {
+  /* Elimina la paleta por defecto de Tailwind: solo existen estos colores. */
+  --color-*: initial;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-control: var(--border-control);
+
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-fg: var(--primary-fg);
+
+  --color-ok: var(--ok);
+  --color-ok-dim: var(--ok-dim);
+  --color-warn: var(--warn);
+  --color-warn-dim: var(--warn-dim);
+  --color-danger: var(--danger);
+  --color-danger-dim: var(--danger-dim);
+
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-sans: var(--font-geist-sans), -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* escala de radios: usar solo estos */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-pop: var(--shadow);
+
+  --ease-out-expo: var(--ease);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--text);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scrollbar-color: var(--active) transparent;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    overflow-x: hidden;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: var(--text);
+    color: var(--bg);
+  }
+
+  /* Foco visible en todo elemento interactivo. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  button,
+  [role="button"],
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  /* Cifras alineadas en tablas y KPIs. */
+  .tabular,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Controles nativos en la paleta. */
+  input,
+  textarea,
+  select,
+  progress,
+  meter {
+    accent-color: var(--primary);
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Contenedor con scroll horizontal propio (tablas, gráficos anchos). */
+@utility scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
