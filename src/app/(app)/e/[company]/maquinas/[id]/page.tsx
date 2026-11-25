@@ -77,7 +77,6 @@ export default async function MachinePage({ params, searchParams }: Props) {
   const tab = rawTab === "impresiones" || rawTab === "mantenimiento" || rawTab === "ajustes" ? rawTab : "resumen";
   const today = todayISO(org.timeZone);
   const monthStart = startOfDayInZone(`${monthOf(today)}-01`, org.timeZone);
-  const since30d = new Date(Date.now() - 30 * 86_400_000);
 
   const header = (
     <>
@@ -266,7 +265,7 @@ export default async function MachinePage({ params, searchParams }: Props) {
     );
   }
 
-  const [stats, events] = await Promise.all([getMachineStats(db, company.id, machine.id, monthStart, since30d), listMachineEvents(db, company.id, machine.id, 40)]);
+  const [stats, events] = await Promise.all([getMachineStats(db, company.id, machine.id, monthStart), listMachineEvents(db, company.id, machine.id, 40)]);
   const finished = stats.completed + stats.failed;
   const hourlyCents = machine.purchasePriceCents && machine.lifespanHours > 0 ? machine.purchasePriceCents / machine.lifespanHours : null;
   const amortized = machine.lifespanHours > 0 ? (machine.totalPrintSeconds / 3600 / machine.lifespanHours) * 100 : 0;

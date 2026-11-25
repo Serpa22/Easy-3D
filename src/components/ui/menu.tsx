@@ -24,7 +24,8 @@ export interface DropdownMenuProps {
 
 /**
  * Menú desplegable sobre la API Popover: se cierra con Esc o al pulsar fuera,
- * se recoloca para no salirse de la ventana y se recorre con las flechas.
+ * sigue a su botón al desplazar la página sin salirse de la ventana y se
+ * recorre con las flechas.
  */
 export function DropdownMenu({ trigger, label, align = "end", variant = "ghost", size = "md", triggerClassName, children }: DropdownMenuProps) {
   const id = useId();
@@ -60,8 +61,9 @@ export function DropdownMenu({ trigger, label, align = "end", variant = "ghost",
         menu.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
       }
     };
+    // Al desplazar o redimensionar, el menú sigue a su botón (no se cierra).
     const onReflow = () => {
-      if (isOpen()) close();
+      if (isOpen()) place();
     };
     menu.addEventListener("toggle", onToggle);
     window.addEventListener("resize", onReflow);

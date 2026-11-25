@@ -55,8 +55,13 @@ export const CONNECTION_SPECS: Record<ConnectionType, ConnectionSpec> = {
   },
   bambu: {
     type: "bambu",
-    summary: "Conexión local por MQTT con impresoras Bambu Lab (X1, P1, A1, H2…).",
-    steps: [],
+    summary: "Conexión local con impresoras Bambu Lab (X1, P1, A1, P2S, H2…). Solo lectura: la app no envía órdenes a la impresora.",
+    steps: [
+      "En la pantalla de la impresora abre Ajustes → Red (WLAN): ahí están la dirección IP y el «Código de acceso».",
+      "El número de serie está en Ajustes → Dispositivo (también en Bambu Studio o Bambu Handy).",
+      "La impresora debe estar en la misma red que el equipo donde corre la app (o el bridge). No hace falta activar el modo «Solo LAN».",
+      "Si reinicias la impresora de fábrica o renuevas el código, actualízalo aquí.",
+    ],
     fields: [
       { key: "host", label: "Dirección IP", type: "text", required: true, placeholder: "192.168.1.50" },
       { key: "serial", label: "Número de serie", type: "text", required: true, placeholder: "01P00A123456789" },
@@ -65,8 +70,12 @@ export const CONNECTION_SPECS: Record<ConnectionType, ConnectionSpec> = {
   },
   moonraker: {
     type: "moonraker",
-    summary: "Impresoras con Klipper y Moonraker (Voron, Creality K1 con root, Sovol, Elegoo Neptune 4, QIDI…).",
-    steps: [],
+    summary: "Impresoras con Klipper y Moonraker (Voron, Sovol, QIDI, Elegoo Neptune 4, Creality K1 con acceso root…).",
+    steps: [
+      "Usa la misma dirección con la que abres Mainsail o Fluidd en el navegador (IP o nombre, sin «http://»).",
+      "El puerto de Moonraker es 7125 salvo que lo hayas cambiado.",
+      "Si Moonraker exige autenticación, copia la clave API desde los ajustes de Mainsail/Fluidd. En redes domésticas normalmente no hace falta.",
+    ],
     fields: [
       { key: "host", label: "Dirección (IP o nombre)", type: "text", required: true, placeholder: "192.168.1.60" },
       { key: "port", label: "Puerto", type: "number", defaultValue: 7125 },
@@ -76,7 +85,10 @@ export const CONNECTION_SPECS: Record<ConnectionType, ConnectionSpec> = {
   octoprint: {
     type: "octoprint",
     summary: "Impresoras controladas con OctoPrint (OctoPi).",
-    steps: [],
+    steps: [
+      "Dirección: la que usas para abrir OctoPrint, por ejemplo http://octopi.local o http://192.168.1.70.",
+      "Clave API: en OctoPrint, Ajustes → «Application Keys» (o «API») → genera una clave para Easy 3D.",
+    ],
     fields: [
       { key: "baseUrl", label: "Dirección de OctoPrint", type: "text", required: true, placeholder: "http://192.168.1.70" },
       { key: "apiKey", label: "Clave API", type: "password", required: true, secret: true },
@@ -85,7 +97,10 @@ export const CONNECTION_SPECS: Record<ConnectionType, ConnectionSpec> = {
   prusalink: {
     type: "prusalink",
     summary: "Impresoras Prusa con PrusaLink (MK4, MK3.9, MINI, XL, CORE One…).",
-    steps: [],
+    steps: [
+      "En la impresora: Ajustes → Red → PrusaLink. Ahí aparecen la dirección IP y la clave API (o el usuario «maker» y su contraseña).",
+      "Rellena la clave API o bien el usuario y la contraseña: basta con una de las dos opciones.",
+    ],
     fields: [
       { key: "host", label: "Dirección IP", type: "text", required: true, placeholder: "192.168.1.80" },
       { key: "apiKey", label: "Clave API (PrusaLink)", type: "password", secret: true },
@@ -95,9 +110,15 @@ export const CONNECTION_SPECS: Record<ConnectionType, ConnectionSpec> = {
   },
   elegoo: {
     type: "elegoo",
-    summary: "Impresoras Elegoo con protocolo SDCP (Saturn, Mars, Centauri Carbon…).",
-    steps: [],
-    fields: [{ key: "host", label: "Dirección IP", type: "text", required: true, placeholder: "192.168.1.90" }],
+    summary: "Experimental. Impresoras Elegoo con protocolo SDCP (Saturn y Mars recientes, Centauri Carbon). Todavía sin validar con todos los modelos.",
+    steps: [
+      "La dirección IP está en la pantalla de la impresora, en Ajustes → Red.",
+      "La impresora admite pocas conexiones a la vez: si ChituBox u otra app está conectada, puede rechazar la de Easy 3D.",
+    ],
+    fields: [
+      { key: "host", label: "Dirección IP", type: "text", required: true, placeholder: "192.168.1.90" },
+      { key: "mainboardId", label: "ID de placa (opcional)", type: "text", help: "Normalmente se detecta sola. Rellénalo solo si la detección falla." },
+    ],
   },
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/display";
 import { Field, Input, NumberInput, Select } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
@@ -8,6 +8,7 @@ import { localHourAndWeekday, parseLocalDateTime, toLocalDateTimeInput } from "@
 import { TARIFF_PERIOD_LABELS, type TariffPeriod } from "@/lib/domain";
 import { energyCost, priceForPeriod, tariffPeriodAt, type ElectricityTariff } from "@/lib/energy";
 import { formatKwh, formatMoney, formatNumber, formatTime } from "@/lib/format";
+import { useNow } from "@/lib/use-now";
 import { parseDecimal } from "@/lib/validation";
 
 const HEIGHT: Record<TariffPeriod, string> = { valley: "h-3", flat: "h-6", peak: "h-9" };
@@ -15,13 +16,9 @@ const FILL: Record<TariffPeriod, string> = { valley: "bg-fg-3", flat: "bg-fg-2",
 
 /** Periodo actual y franja de 24 h de hoy (altura + etiqueta: no depende del color). */
 export function TariffToday({ tariff, timeZone }: { tariff: ElectricityTariff; timeZone: string }) {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(t);
-  }, []);
-  if (!now) return <div className="h-24" aria-hidden="true" />;
+  const nowMs = useNow();
+  if (!nowMs) return <div className="h-24" aria-hidden="true" />;
+  const now = new Date(nowMs);
   const local = localHourAndWeekday(now, timeZone);
   // Periodo de cada hora de hoy: se evalúa al comienzo de cada hora local.
   const startOfDay = new Date(now.getTime() - (local.hour * 3600 + now.getMinutes() * 60 + now.getSeconds()) * 1000);
@@ -61,8 +58,10 @@ export function TariffToday({ tariff, timeZone }: { tariff: ElectricityTariff; t
 export function EnergySimulator({ tariff, timeZone, machines }: { tariff: ElectricityTariff; timeZone: string; machines: Array<{ id: string; name: string; powerPrintW: number }> }) {
   const [machineId, setMachineId] = useState(machines[0]?.id ?? "");
   const [hours, setHours] = useState("4");
-  const [start, setStart] = useState("");
-  useEffect(() => setStart(toLocalDateTimeInput(new Date(), timeZone)), [timeZone]);
+  // Hasta que el usuario elige otra hora, el inicio es «ahora».
+  const nowMs = useNow();
+  const [chosenStart, setStart] = useState<string | null>(null);
+  const start = chosenStart ?? (nowMs ? toLocalDateTimeInput(new Date(nowMs), timeZone) : "");
   const machine = machines.find((m) => m.id === machineId);
   const result = useMemo(() => {
     const startDate = parseLocalDateTime(start, timeZone);

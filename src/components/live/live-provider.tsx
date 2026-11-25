@@ -54,10 +54,12 @@ export function LiveProvider({ initial, company, intervalMs = 3000, children }: 
     }
   }, [company]);
 
-  // Si el servidor vuelve a renderizar con datos más nuevos, se adoptan.
-  useEffect(() => {
-    setSnapshot((current) => (initial.serverTime > current.serverTime ? initial : current));
-  }, [initial]);
+  // Si el servidor vuelve a renderizar con datos más nuevos, se adoptan (ajuste durante el render).
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    if (initial.serverTime > snapshot.serverTime) setSnapshot(initial);
+  }
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;

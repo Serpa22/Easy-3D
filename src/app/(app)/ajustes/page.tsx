@@ -193,7 +193,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             { key: "actions", header: <span className="sr-only">Acciones</span>, align: "right", className: "w-12 px-1" },
           ]}
           rows={bridges.map((b) => {
-            const alive = b.lastSeenAt !== null && Date.now() - b.lastSeenAt.getTime() < 120_000;
+            const alive = b.alive;
             return {
               key: b.id,
               cells: [

@@ -39,7 +39,8 @@ export interface MachineStats {
   maintenanceCents: number;
 }
 
-export async function getMachineStats(db: DbOrTx, companyId: string, machineId: string, monthStart: Date, since30d: Date): Promise<MachineStats> {
+export async function getMachineStats(db: DbOrTx, companyId: string, machineId: string, monthStart: Date): Promise<MachineStats> {
+  const since30d = new Date(Date.now() - 30 * 86_400_000);
   const scope = and(eq(printJobs.companyId, companyId), eq(printJobs.machineId, machineId));
   const [[jobs], [maintenance]] = await Promise.all([
     db

@@ -51,3 +51,4 @@ next-env.d.ts
 
 # bridge compilado
 /dist/
+/.data-e2e/

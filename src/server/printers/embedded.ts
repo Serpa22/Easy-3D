@@ -4,7 +4,7 @@
  * máquinas, sin programa puente.
  */
 import "server-only";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, isNull, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { machines } from "@/server/db/schema";
 import { applyTelemetry } from "./ingest";

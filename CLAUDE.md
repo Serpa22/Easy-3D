@@ -34,8 +34,11 @@ src/app/                      rutas (App Router)
                               productos, maquinas, impresiones, materiales, energia, ajustes
     ajustes/                  ajustes globales (organización, usuarios, conexiones/bridges)
   api/                        route handlers (live, bridge, health)
-src/components/ui/            kit de interfaz (LEE src/components/ui/README.md antes de crear UI)
-src/components/charts/        kit de gráficos (LEE src/components/charts/README.md)
+src/components/ui/            kit de interfaz: button, form (controles, Field, ActionForm, useAction, filtros por URL),
+                              dialog, menu, actions (FormDialogButton, ActionsMenu, ActionButton), display (Card, Stat,
+                              Badge, StatusDot, EmptyState, PageHeader, Alert…), table (DataTable), nav (TabsNav,
+                              Pagination, MonthNav, FilterChips), toast, client-bits (ThemeToggle, CopyButton, RelativeTime)
+src/components/charts/        gráficos: bar-chart, line-chart, simple (BarList, StackedBar, Sparkline)
 src/components/<módulo>/      componentes de cada módulo
 src/lib/                      código isomórfico: domain.ts (enums + etiquetas), format.ts, dates.ts,
                               validation.ts, telemetry.ts, action.ts, cn.ts
@@ -67,7 +70,8 @@ drizzle/                      migraciones SQL generadas
 
 - **Página** (`page.tsx`, Server Component): `const { company } = await requireCompany((await params).company)`, llama a funciones de `src/server/queries/<módulo>.ts` y pinta. Filtros y paginación por `searchParams` (URL compartible).
 - **Server Actions** en `src/server/actions/<módulo>.ts` con `"use server"`. Firma para formularios: `(slug: string, prev: ActionState, formData: FormData) => Promise<ActionResult>`; se enlaza con `action.bind(null, slug)`. Cuerpo siempre dentro de `runAction(async () => { … })` y validado con `parseForm(schema, formData)`. Tras escribir: `revalidatePath(...)`. Devuelve `{ message: "…" }` para el toast.
-- **Formularios**: `ActionForm` + `Field` + `SubmitButton` del kit (gestionan estado pendiente, errores por campo y toast). Altas y ediciones en `Dialog`; borrados con confirmación.
+- **Formularios**: `ActionForm` + `Field` + `SubmitButton` del kit (gestionan estado pendiente, errores por campo y toast). Altas y ediciones en `Dialog`; borrados con confirmación. Para formularios sencillos no hace falta un componente cliente: `FormDialogButton` y `ActionsMenu` (`@/components/ui/actions`) reciben los campos como hijos y la Server Action ya enlazada.
+- La lógica que deba probarse va en funciones puras de `(db, companyId, datos)` en `src/server/domain/*-service.ts`; la Server Action es un envoltorio fino.
 - Lecturas: nunca hagas fetch desde el cliente a la BD; pasa datos serializables del Server Component al Client Component.
 
 ## Reglas de diseño (obligatorias)
@@ -87,4 +91,10 @@ Estética: **monocromo negro/blanco, elegante, sobria, muy legible**. Tema oscur
 
 ## Verificación
 
-Antes de dar algo por terminado: `npm run typecheck`, y mira la pantalla de verdad (Playwright a 1440 px y 390 px, tema oscuro y claro) comprobando desbordes, solapes, contraste y consola sin errores.
+Antes de dar algo por terminado: `npm run typecheck`, `npm run lint`, `npm test`, y mira la pantalla de verdad (Playwright a 1440 px y 390 px, tema oscuro y claro) comprobando desbordes, solapes, contraste y consola sin errores. `npm run build && npm run test:e2e` recorre el primer arranque, las máquinas en directo, finanzas, pedidos y la sesión contra el build de producción.
+
+## Impresoras
+
+- Un adaptador por protocolo en `src/server/printers/adapters/<tipo>.ts`: exporta `createAdapter` y una función pura `mapXxx` (probada) que traduce al modelo común `PrinterTelemetry` (`src/lib/telemetry.ts`).
+- `adapters/**`, `manager.ts`, `registry.ts` y `types.ts` se ejecutan también en el bridge (Node puro): no importan `server-only`, `next/*` ni alias `@/`.
+- `ingest.ts` convierte telemetría en hechos (estado en directo, impresiones abiertas/cerradas, eventos). Toda apertura o cierre de impresión pasa por `domain/print-jobs.ts`.

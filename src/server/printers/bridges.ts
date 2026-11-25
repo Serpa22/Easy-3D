@@ -21,10 +21,12 @@ export interface BridgeRow {
   version: string | null;
   createdAt: Date;
   machineCount: number;
+  /** Ha dado señal en los últimos 2 minutos. */
+  alive: boolean;
 }
 
 export async function listBridges(db: DbOrTx): Promise<BridgeRow[]> {
-  return db
+  const rows = await db
     .select({
       id: bridges.id,
       name: bridges.name,
@@ -35,6 +37,8 @@ export async function listBridges(db: DbOrTx): Promise<BridgeRow[]> {
     })
     .from(bridges)
     .orderBy(bridges.createdAt);
+  const now = Date.now();
+  return rows.map((b) => ({ ...b, alive: b.lastSeenAt !== null && now - b.lastSeenAt.getTime() < 120_000 }));
 }
 
 /** Borra un bridge; sus máquinas pasan a «este servidor» (bridgeId → null). */

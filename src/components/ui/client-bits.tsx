@@ -1,20 +1,26 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { Check, Copy, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatRelative } from "@/lib/format";
 import type { Theme } from "@/lib/theme";
+import { useNow } from "@/lib/use-now";
 import { setThemeAction } from "@/server/actions/theme";
 import { buttonClass } from "./button";
 
+/* El tema vive en <html data-theme>: se observa ese atributo como fuente de verdad. */
+function subscribeTheme(listener: () => void) {
+  const observer = new MutationObserver(listener);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => observer.disconnect();
+}
+const readTheme = (): Theme => (document.documentElement.dataset.theme === "light" ? "light" : "dark");
+
 /** Alterna tema oscuro / claro: cambia al instante y guarda la preferencia en una cookie. */
 export function ThemeToggle({ className, showLabel }: { className?: string; showLabel?: boolean }) {
-  const [theme, setTheme] = useState<Theme | null>(null);
+  const theme = useSyncExternalStore<Theme | null>(subscribeTheme, readTheme, () => null);
   const [, startTransition] = useTransition();
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
-  }, []);
   const next: Theme = theme === "light" ? "dark" : "light";
   const label = next === "light" ? "Cambiar a tema claro" : "Cambiar a tema oscuro";
   return (
@@ -24,7 +30,6 @@ export function ThemeToggle({ className, showLabel }: { className?: string; show
       title={label}
       onClick={() => {
         document.documentElement.dataset.theme = next;
-        setTheme(next);
         startTransition(() => setThemeAction(next));
       }}
       className={cn(buttonClass({ variant: "ghost" }), !showLabel && "w-10 px-0 pointer-coarse:w-11", className)}
@@ -71,16 +76,11 @@ export function CopyButton({ value, label = "Copiar", className }: { value: stri
  * el cliente para no provocar desajustes de hidratación.
  */
 export function RelativeTime({ value, className, fallback = "—" }: { value: string | Date | null | undefined; className?: string; fallback?: string }) {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+  const now = useNow();
   if (!value) return <span className={className}>{fallback}</span>;
   return (
     <time dateTime={typeof value === "string" ? value : value.toISOString()} className={className} suppressHydrationWarning>
-      {now ? formatRelative(value, now) : "…"}
+      {now ? formatRelative(value, new Date(now)) : "…"}
     </time>
   );
 }

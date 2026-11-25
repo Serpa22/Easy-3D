@@ -34,9 +34,8 @@ export function Dialog({ open, onClose, title, description, size = "md", footer,
   const titleId = useId();
   const descId = useId();
 
-  useEffect(() => {
-    if (open) setMounted(true);
-  }, [open]);
+  // Al abrir se monta el contenido (ajuste de estado durante el render, sin efecto).
+  if (open && !mounted) setMounted(true);
 
   useEffect(() => {
     const dialog = ref.current;
