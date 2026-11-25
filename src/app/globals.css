@@ -216,6 +216,8 @@
 
 /* Contenedor con scroll horizontal propio (tablas, gráficos anchos). */
 @utility scroll-x {
+  /* relative: contiene (y recorta) los elementos absolutos del interior, p. ej. textos sr-only. */
+  position: relative;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;

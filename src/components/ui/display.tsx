@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 /* ------------------------------- Tarjetas ------------------------------- */
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-lg border border-line bg-surface", className)} {...props} />;
+  return <div className={cn("min-w-0 rounded-lg border border-line bg-surface", className)} {...props} />;
 }
 
 export function CardHeader({

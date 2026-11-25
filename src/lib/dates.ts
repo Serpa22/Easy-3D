@@ -115,3 +115,21 @@ export function localHourAndWeekday(date: Date, timeZone = DEFAULT_TIME_ZONE): {
     dateISO: local.toISOString().slice(0, 10),
   };
 }
+
+/** 'YYYY-MM-DDTHH:mm' (campo datetime-local) interpretado en una zona horaria → instante. */
+export function parseLocalDateTime(value: string, timeZone = DEFAULT_TIME_ZONE): Date | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value ?? "");
+  if (!match || !isISODate(match[1])) return null;
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  if (hour > 23 || minute > 59) return null;
+  const guess = new Date(`${match[1]}T${match[2]}:${match[3]}:00Z`);
+  const first = new Date(guess.getTime() - zoneOffsetMs(guess, timeZone));
+  // Segunda pasada por si el desfase cambia cerca de ese instante (cambio de hora).
+  return new Date(guess.getTime() - zoneOffsetMs(first, timeZone));
+}
+
+/** Instante → 'YYYY-MM-DDTHH:mm' en una zona horaria (para rellenar un datetime-local). */
+export function toLocalDateTimeInput(date: Date, timeZone = DEFAULT_TIME_ZONE): string {
+  return new Date(date.getTime() + zoneOffsetMs(date, timeZone)).toISOString().slice(0, 16);
+}

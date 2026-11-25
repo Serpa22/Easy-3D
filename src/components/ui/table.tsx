@@ -10,7 +10,7 @@ const HIDE = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidd
 /** Tabla dentro de su propio contenedor con scroll horizontal. */
 export function Table({ className, children, ...props }: ComponentProps<"table">) {
   return (
-    <div className="scroll-x rounded-lg border border-line bg-surface">
+    <div className="scroll-x relative rounded-lg border border-line bg-surface">
       <table className={cn("w-full border-collapse text-sm", className)} {...props}>
         {children}
       </table>
