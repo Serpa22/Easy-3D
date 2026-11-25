@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "/**": ["./drizzle/**/*"],
   },
   poweredByHeader: false,
+  devIndicators: false,
   turbopack: {
     rules: {
       "*.css": {

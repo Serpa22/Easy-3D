@@ -16,6 +16,12 @@ import { ActionError, parseForm, parseInput, runAction } from "@/server/action";
 import { requireCompany } from "@/server/context";
 import { transactions } from "@/server/db/schema";
 
+/**
+ * Los movimientos manuales y los cargos de gastos recurrentes (hechos ya
+ * generados) se pueden editar y borrar aquí; el resto se gestiona desde su origen.
+ */
+const EDITABLE_SOURCES: readonly string[] = ["manual", "recurring"];
+
 const transactionSchema = z
   .object({
     id: zOptionalId(),
@@ -35,7 +41,7 @@ const transactionSchema = z
     }
   });
 
-/** Crea o edita un movimiento manual (ingreso o gasto). */
+/** Crea un movimiento manual o edita uno existente (manual o cargo recurrente). */
 export async function saveTransactionAction(slug: string, _prev: ActionState, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     const { company, db } = await requireCompany(slug);
@@ -59,7 +65,7 @@ export async function saveTransactionAction(slug: string, _prev: ActionState, fo
         .where(and(eq(transactions.id, input.id), eq(transactions.companyId, company.id)))
         .limit(1);
       if (!existing) throw new ActionError("El movimiento ya no existe.");
-      if (existing.sourceType !== "manual") {
+      if (!EDITABLE_SOURCES.includes(existing.sourceType)) {
         throw new ActionError(
           `Este movimiento se genera automáticamente (${TRANSACTION_SOURCE_LABELS[existing.sourceType].toLowerCase()}). Edítalo desde su origen.`,
         );
@@ -77,7 +83,7 @@ export async function saveTransactionAction(slug: string, _prev: ActionState, fo
   });
 }
 
-/** Elimina un movimiento manual. Los derivados se eliminan desde su origen. */
+/** Elimina un movimiento manual o un cargo recurrente. Los demás se eliminan desde su origen. */
 export async function deleteTransactionAction(slug: string, id: string): Promise<ActionResult> {
   return runAction(async () => {
     const { company, db } = await requireCompany(slug);
@@ -88,7 +94,7 @@ export async function deleteTransactionAction(slug: string, id: string): Promise
       .where(and(eq(transactions.id, transactionId), eq(transactions.companyId, company.id)))
       .limit(1);
     if (!existing) throw new ActionError("El movimiento ya no existe.");
-    if (existing.sourceType !== "manual") {
+    if (!EDITABLE_SOURCES.includes(existing.sourceType)) {
       throw new ActionError(
         `Este movimiento se genera automáticamente (${TRANSACTION_SOURCE_LABELS[existing.sourceType].toLowerCase()}). Elimínalo desde su origen.`,
       );

@@ -1,0 +1,394 @@
+/* Mismo orden de capas que Tailwind, por si esta hoja se carga antes que globals.css. */
+@layer theme, base, components, utilities;
+
+/* ------------------------------------------------------------------
+   Gráficos — codificación monocroma
+   (API y reglas: src/components/charts/README.md)
+
+   El producto es estrictamente blanco y negro, así que la identidad de
+   una serie NO puede depender del tono. Cada serie combina:
+     1. un paso de luminosidad (≥ 21 ΔE OKLab entre vecinos, ≥ 3:1 sobre
+        la superficie), y
+     2. una codificación secundaria: relleno sólido / trama diagonal /
+        contorno en barras; trazo continuo / discontinuo / punteado en líneas.
+   Máximo 3 series. Con ≥ 2 series la leyenda es obligatoria.
+
+   Los colores de estado (--chart-ok / warn / danger) solo marcan estado
+   (p. ej. un mes en pérdidas), nunca identifican una serie.
+------------------------------------------------------------------- */
+
+:root {
+  /* series */
+  --chart-1: #f5f5f5; /* serie 1 · relleno sólido · trazo continuo */
+  --chart-2: #a8a8a8; /* serie 2 · trama diagonal · trazo discontinuo */
+  --chart-3: #666666; /* serie 3 · contorno · trazo punteado */
+  --chart-muted: #666666; /* barras de contexto cuando se destaca una */
+
+  /* trama diagonal (45°) de la serie 2: tinta = --chart-2 sobre esta base */
+  --chart-texture-base: #2e2e2e;
+
+  /* mobiliario: líneas finas y sólidas, un paso por encima de la superficie */
+  --chart-grid: #1e1e1e;
+  --chart-axis: #3d3d3d;
+  --chart-cursor: #6b6b6b; /* línea vertical del cursor */
+  --chart-band: rgba(255, 255, 255, 0.06); /* columna bajo el cursor */
+
+  /* superficie sobre la que se pinta: separa marcas (hueco de 2 px) y rodea
+     los puntos. Sobrescríbela en el contenedor si el gráfico no va en bg-surface. */
+  --chart-surface: var(--surface);
+  --chart-area-opacity: 0.1;
+
+  /* estado (reservado) */
+  --chart-ok: var(--ok);
+  --chart-warn: var(--warn);
+  --chart-danger: var(--danger);
+
+  --chart-font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root[data-theme="light"] {
+  --chart-1: #111111;
+  --chart-2: #4d4d4d;
+  --chart-3: #8a8a8a;
+  --chart-muted: #8a8a8a;
+
+  --chart-texture-base: #d6d6d6;
+
+  --chart-grid: #e8e8e8;
+  --chart-axis: #c4c4c4;
+  --chart-cursor: #858585;
+  --chart-band: rgba(0, 0, 0, 0.05);
+}
+
+/* Más contraste a petición del usuario: refuerza solo lo que es tenue a propósito. */
+@media (prefers-contrast: more) {
+  :root {
+    --chart-grid: #3d3d3d;
+    --chart-axis: #8c8c8c;
+    --chart-cursor: #fafafa;
+  }
+  :root[data-theme="light"] {
+    --chart-grid: #c4c4c4;
+    --chart-axis: #6b6b6b;
+    --chart-cursor: #0a0a0a;
+  }
+}
+
+/* Colores forzados (alto contraste de Windows): el SVG conserva los colores del
+   autor, así que los tokens pasan a colores del sistema. La trama y el contorno
+   siguen distinguiendo las series aunque las tres compartan tinta. */
+@media (forced-colors: active) {
+  :root,
+  :root[data-theme="light"] {
+    --chart-1: CanvasText;
+    --chart-2: CanvasText;
+    --chart-3: CanvasText;
+    --chart-muted: GrayText;
+    --chart-texture-base: Canvas;
+    --chart-grid: GrayText;
+    --chart-axis: CanvasText;
+    --chart-cursor: Highlight;
+    --chart-band: transparent;
+    --chart-surface: Canvas;
+    --chart-ok: CanvasText;
+    --chart-warn: CanvasText;
+    --chart-danger: CanvasText;
+  }
+}
+
+@layer components {
+  /* ---------- marco ---------- */
+  .chart {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .chart-body {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chart-svg {
+    display: block;
+    overflow: visible;
+    /* el dedo recorre los datos en horizontal; el scroll vertical sigue libre */
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Las marcas aparecen con un fundido corto; sin movimiento si el usuario lo pide. */
+  @media (prefers-reduced-motion: no-preference) {
+    .chart-marks {
+      animation: chart-fade-in 220ms var(--ease) both;
+    }
+    .chart-tooltip {
+      animation: chart-fade-in 150ms var(--ease) both;
+    }
+  }
+
+  /* ---------- mobiliario ---------- */
+  .chart-grid-line {
+    stroke: var(--chart-grid);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+  }
+  .chart-axis-line {
+    stroke: var(--chart-axis);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+  }
+  .chart-cursor-line {
+    stroke: var(--chart-cursor);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+  }
+  .chart-band {
+    fill: var(--chart-band);
+  }
+
+  /* el texto nunca lleva el color de la serie: usa la rampa de texto */
+  .chart-tick {
+    fill: var(--text-3);
+    font-family: var(--chart-font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-xlabel {
+    fill: var(--text-3);
+    font-size: 11px;
+  }
+  .chart-xlabel[data-strong="true"] {
+    fill: var(--text);
+    font-weight: 500;
+  }
+  .chart-end-label {
+    fill: var(--text-2);
+    font-size: 12px;
+  }
+  .chart-value-label {
+    fill: var(--text);
+    font-family: var(--chart-font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-leader {
+    stroke: var(--chart-axis);
+    stroke-width: 1;
+  }
+
+  /* ---------- marcas: barras ---------- */
+  .chart-mark-solid {
+    fill: var(--chart-1);
+  }
+  .chart-mark-outline {
+    fill: var(--chart-surface);
+    stroke: var(--chart-3);
+    stroke-width: 1.5;
+  }
+  .chart-mark-muted {
+    fill: var(--chart-muted);
+  }
+  .chart-mark-ok {
+    fill: var(--chart-ok);
+  }
+  .chart-mark-warn {
+    fill: var(--chart-warn);
+  }
+  .chart-mark-danger {
+    fill: var(--chart-danger);
+  }
+  .chart-texture-base {
+    fill: var(--chart-texture-base);
+  }
+  .chart-texture-ink {
+    stroke: var(--chart-2);
+  }
+
+  /* ---------- marcas: líneas ---------- */
+  .chart-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .chart-line-1 {
+    stroke: var(--chart-1);
+  }
+  .chart-line-2 {
+    stroke: var(--chart-2);
+    stroke-dasharray: 7 5;
+  }
+  .chart-line-3 {
+    stroke: var(--chart-3);
+    stroke-dasharray: 0.1 5; /* puntos: extremos redondos */
+  }
+  .chart-area {
+    stroke: none;
+    fill-opacity: var(--chart-area-opacity);
+  }
+  .chart-area-1 {
+    fill: var(--chart-1);
+  }
+  .chart-area-2 {
+    fill: var(--chart-2);
+  }
+  .chart-area-3 {
+    fill: var(--chart-3);
+  }
+  /* punto final / punto del cursor: ≥ 8 px con anillo de 2 px de superficie */
+  .chart-dot {
+    stroke: var(--chart-surface);
+    stroke-width: 2;
+  }
+  .chart-dot-1 {
+    fill: var(--chart-1);
+  }
+  .chart-dot-2 {
+    fill: var(--chart-2);
+  }
+  .chart-dot-3 {
+    fill: var(--chart-3);
+  }
+
+  /* ---------- zona interactiva (una por posición del eje X) ---------- */
+  .chart-hit {
+    fill: transparent;
+    stroke: none;
+    cursor: crosshair;
+    /* el foco se dibuja con el propio trazo: el outline en SVG es irregular entre navegadores */
+    outline: none;
+  }
+  .chart-hit:focus-visible {
+    stroke: var(--ring);
+    stroke-width: 2;
+  }
+
+  /* ---------- tooltip ---------- */
+  .chart-tooltip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    pointer-events: none;
+    max-width: min(280px, 100%);
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md, 10px);
+    background: var(--elevated);
+    box-shadow: var(--shadow);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* ---------- tabla alternativa ---------- */
+  .chart-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .chart-table caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .chart-table th,
+  .chart-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .chart-table th:first-child,
+  .chart-table td:first-child {
+    padding-left: 0;
+    text-align: left;
+  }
+  .chart-table th:last-child,
+  .chart-table td:last-child {
+    padding-right: 0;
+  }
+  .chart-table thead th {
+    color: var(--text-3);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .chart-table tbody th {
+    color: var(--text-2);
+    font-weight: 400;
+  }
+  .chart-table tbody td {
+    color: var(--text);
+    font-family: var(--chart-font-mono);
+  }
+  .chart-table tbody tr:last-child th,
+  .chart-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  /* ---------- botón «ver tabla» ---------- */
+  .chart-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-3);
+    transition:
+      background-color 150ms var(--ease),
+      color 150ms var(--ease),
+      border-color 150ms var(--ease);
+  }
+  .chart-toggle:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .chart-toggle:active {
+    background: var(--active);
+  }
+  .chart-toggle[aria-pressed="true"] {
+    border-color: var(--border-control);
+    background: var(--hover);
+    color: var(--text);
+  }
+  @media (pointer: coarse) {
+    .chart-toggle {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
+  /* ---------- barra apilada (StackedBar) ---------- */
+  .chart-segment {
+    container-type: inline-size;
+    position: relative;
+    min-width: 2px;
+    overflow: hidden;
+  }
+  /* la cifra solo se imprime dentro del bloque si cabe con holgura */
+  .chart-segment-label {
+    display: none;
+  }
+  @container (min-width: 46px) {
+    .chart-segment-label {
+      display: inline-flex;
+    }
+  }
+}
+
+@keyframes chart-fade-in {
+  from {
+    opacity: 0;
+  }
+}

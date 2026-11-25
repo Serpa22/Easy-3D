@@ -2,8 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { Toaster } from "@/components/ui/toast";
 import { THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
+import "./styles/kit-forms.css";
+import "./styles/kit-display.css";
+import "./styles/charts.css";
 
 export const metadata: Metadata = {
   title: { default: "Easy 3D", template: "%s · Easy 3D" },
@@ -29,7 +33,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = jar.get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
   return (
     <html lang="es" data-theme={theme} className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}>
-      <body className="min-h-full bg-bg text-fg">{children}</body>
+      <body className="min-h-full bg-bg text-fg">
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }
