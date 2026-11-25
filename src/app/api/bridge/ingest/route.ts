@@ -1,0 +1,58 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
+import { getDb } from "@/server/db";
+import { machines } from "@/server/db/schema";
+import { authenticateBridge } from "@/server/printers/bridges";
+import { applyTelemetry } from "@/server/printers/ingest";
+
+export const dynamic = "force-dynamic";
+
+const MAX_BODY = 512 * 1024;
+const bodySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        machineId: z.uuid(),
+        // La telemetría se normaliza y acota en la ingesta (sanitizeTelemetry).
+        telemetry: z.record(z.string(), z.unknown()),
+        at: z.iso.datetime({ offset: true }),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+/** Recibe telemetría de un bridge. Solo se aceptan máquinas asignadas a ese bridge. */
+export async function POST(request: NextRequest) {
+  const db = await getDb();
+  const bridge = await authenticateBridge(db, request.headers.get("authorization"), request.headers.get("x-bridge-version"));
+  if (!bridge) return NextResponse.json({ error: "Token no válido" }, { status: 401 });
+
+  const text = await request.text();
+  if (text.length > MAX_BODY) return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return NextResponse.json({ error: "JSON no válido" }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(json);
+  if (!parsed.success) return NextResponse.json({ error: "Formato no válido" }, { status: 400 });
+
+  const ids = [...new Set(parsed.data.items.map((i) => i.machineId))];
+  const owned = new Set(
+    (await db.select({ id: machines.id }).from(machines).where(and(eq(machines.bridgeId, bridge.id), inArray(machines.id, ids)))).map((m) => m.id),
+  );
+  let accepted = 0;
+  for (const item of parsed.data.items) {
+    if (!owned.has(item.machineId)) continue;
+    try {
+      await applyTelemetry(db, { machineId: item.machineId, telemetry: item.telemetry as never, at: item.at });
+      accepted += 1;
+    } catch (error) {
+      console.error("[bridge] ingesta", error);
+    }
+  }
+  return NextResponse.json({ ok: true, accepted });
+}
