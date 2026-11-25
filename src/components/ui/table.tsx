@@ -99,7 +99,7 @@ export function DataTable({ columns, rows, empty, caption, className }: { column
             {columns.map((col, i) => (
               <TD key={col.key} align={col.align} numeric={col.numeric} hideBelow={col.hideBelow} className={col.className}>
                 {i === 0 && row.href ? (
-                  <Link href={row.href} className="font-medium text-fg underline-offset-4 hover:underline active:text-fg-2">
+                  <Link href={row.href} className="font-medium text-fg underline-offset-4 hover:underline active:text-fg-2 pointer-coarse:-my-3 pointer-coarse:inline-block pointer-coarse:py-3">
                     {row.cells[i]}
                   </Link>
                 ) : (
