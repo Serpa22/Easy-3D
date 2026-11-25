@@ -167,7 +167,7 @@ export function simulateTelemetry(seed: number, speed: number, nowMs: number, pr
 
 export const createAdapter: AdapterFactory = (ctx) => {
   let timer: ReturnType<typeof setInterval> | undefined;
-  const speed = num(ctx.config.speed) ?? 60;
+  const speed = num(ctx.config.speed) ?? 4;
   const seed = seedFrom(ctx.machineId);
   const profile = ctx.meta?.technology === "resin" ? "resin" : "fdm";
   const tick = () => ctx.onTelemetry(simulateTelemetry(seed, speed, Date.now(), profile));

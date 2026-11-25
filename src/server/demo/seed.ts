@@ -349,7 +349,7 @@ async function seedCompany(tx: Tx, spec: CompanySpec, today: string, timeZone: s
         purchaseDate,
         lifespanHours: m.technology === "resin" ? 3000 : 6000,
         connectionType: m.connection,
-        connectionConfig: m.connection === "simulator" ? { speed: 60 } : {},
+        connectionConfig: m.connection === "simulator" ? { speed: 4 } : {},
         loadedMaterialId: mats[m.material].id,
         sortOrder: i,
       })
