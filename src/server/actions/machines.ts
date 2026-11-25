@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult, ActionState } from "@/lib/action";
 import { mergeConnectionConfig } from "@/lib/connections";
@@ -11,7 +11,7 @@ import { CONNECTION_TYPES, MACHINE_STATUSES, MAINTENANCE_TYPES, TECHNOLOGIES } f
 import { zCheckbox, zDate, zId, zInt, zOptionalCents, zOptionalDate, zOptionalDecimal, zOptionalId, zOptionalText, zText } from "@/lib/validation";
 import { ActionError, formToObject, parseForm, parseInput, runAction } from "@/server/action";
 import { requireCompany } from "@/server/context";
-import { bridges, machines, maintenanceLogs, materials } from "@/server/db/schema";
+import { bridges, machines, maintenanceLogs, materials, transactions } from "@/server/db/schema";
 import { removeMaintenanceExpense, syncMachinePurchaseExpense, syncMaintenanceExpense } from "@/server/domain/derived-expenses";
 import { notifyMachineChanged, testConnection, type ConnectionTestResult } from "@/server/printers";
 
@@ -136,8 +136,19 @@ export async function deleteMachineAction(slug: string, id: string): Promise<Act
   return runAction(async () => {
     const { company, db } = await requireCompany(slug);
     const machineId = parseInput(zId(), id);
-    const deleted = await db.delete(machines).where(and(eq(machines.id, machineId), eq(machines.companyId, company.id))).returning({ id: machines.id });
-    if (deleted.length === 0) throw new ActionError("La máquina ya no existe.");
+    await db.transaction(async (tx) => {
+      const [machine] = await tx.select({ id: machines.id }).from(machines).where(and(eq(machines.id, machineId), eq(machines.companyId, company.id))).limit(1);
+      if (!machine) throw new ActionError("La máquina ya no existe.");
+      // Sus gastos (compra y mantenimientos) son hechos pasados: se conservan en Finanzas,
+      // pero pasan a ser movimientos manuales para que se puedan seguir editando.
+      const logs = await tx.select({ id: maintenanceLogs.id }).from(maintenanceLogs).where(and(eq(maintenanceLogs.machineId, machineId), eq(maintenanceLogs.companyId, company.id)));
+      const sourceIds = [machineId, ...logs.map((l) => l.id)];
+      await tx
+        .update(transactions)
+        .set({ sourceType: "manual", sourceId: null, sourceKey: "" })
+        .where(and(eq(transactions.companyId, company.id), inArray(transactions.sourceType, ["machine", "maintenance"]), inArray(transactions.sourceId, sourceIds)));
+      await tx.delete(machines).where(eq(machines.id, machineId));
+    });
     await notifyMachineChanged(machineId);
     revalidatePath(`/e/${slug}`, "layout");
     redirect(`/e/${slug}/maquinas`);
