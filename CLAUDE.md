@@ -31,8 +31,9 @@ src/app/                      rutas (App Router)
   (auth)/login, (auth)/setup  acceso y primer arranque
   (app)/                      zona autenticada (layout con barra lateral)
     page.tsx                  vista de grupo (todas las sub-empresas)
-    e/[company]/…             una sub-empresa: resumen, finanzas, pedidos, envios, clientes,
+    e/[company]/…             una sub-empresa: resumen, finanzas, pedidos, documentos, envios, clientes,
                               productos, maquinas, impresiones, materiales, energia, ajustes
+  (print)/e/[company]/…       hojas para imprimir / guardar en PDF (documentos y contratos), sin barra lateral
     ajustes/                  ajustes globales (organización, usuarios, conexiones/bridges)
   api/                        route handlers (live, bridge, health)
 src/components/ui/            kit de interfaz: button, form (controles, Field, ActionForm, useAction, filtros por URL),
@@ -97,6 +98,13 @@ Estética: **monocromo negro/blanco, elegante, sobria, muy legible**. Tema oscur
 ## Verificación
 
 Antes de dar algo por terminado: `npm run typecheck`, `npm run lint`, `npm test`, y mira la pantalla de verdad (Playwright a 1440 px y 390 px, tema oscuro y claro) comprobando desbordes, solapes, contraste y consola sin errores. `npm run build && npm run test:e2e` recorre el primer arranque, las máquinas en directo, finanzas, pedidos y la sesión contra el build de producción.
+
+## Documentos y contratos
+
+- Facturas, rectificativas, presupuestos y albaranes en `documents` (+ `document_items`, `document_sequences`). Lógica en `domain/documents-service.ts`, cálculo de importes en `lib/documents.ts` (`computeDocumentTotals`, compartido con el formulario).
+- Numeración correlativa por empresa, tipo y año; en facturas y rectificativas la fecha respeta el orden de la serie y solo se borra la última. Guardan copia de emisor y cliente (`issuer`/`customer`). No tocan Finanzas ni stock.
+- Plantillas de contrato en `lib/contract-templates.ts`: un único texto para la app y para los Word de `public/plantillas/` (regenerar con `scripts/export-contracts.ts` + `scripts/build-contract-docx.py`).
+- La hoja impresa usa `.paper.theme-light` (tokens claros en cualquier tema) y las reglas `@media print` de `globals.css`.
 
 ## Impresoras
 

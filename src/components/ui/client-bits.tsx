@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
-import { Check, Copy, Moon, Sun } from "lucide-react";
+import { Check, Copy, Moon, Printer, Sun } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatRelative } from "@/lib/format";
 import type { Theme } from "@/lib/theme";
@@ -36,6 +36,16 @@ export function ThemeToggle({ className, showLabel }: { className?: string; show
     >
       {theme === "light" ? <Moon className="size-[1.125rem]" aria-hidden="true" /> : <Sun className="size-[1.125rem]" aria-hidden="true" />}
       {showLabel ? <span>{next === "light" ? "Tema claro" : "Tema oscuro"}</span> : null}
+    </button>
+  );
+}
+
+/** Abre el diálogo de impresión del navegador (desde ahí también se guarda en PDF). */
+export function PrintButton({ label = "Imprimir o guardar PDF", className }: { label?: string; className?: string }) {
+  return (
+    <button type="button" onClick={() => window.print()} className={cn(buttonClass({ variant: "primary" }), className)}>
+      <Printer className="size-4" aria-hidden="true" />
+      {label}
     </button>
   );
 }

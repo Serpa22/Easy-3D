@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Pencil, Trash2, Truck, Wallet } from "lucide-react";
 import { z } from "zod";
+import { NewDocumentMenu } from "@/components/documents/shared";
 import { NEXT_STATUS, OrderStatusBadge, PaymentBadge } from "@/components/orders/shared";
 import { ActionButton } from "@/components/ui/actions";
 import { Button } from "@/components/ui/button";
@@ -11,11 +12,12 @@ import { ConfirmButton } from "@/components/ui/dialog";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { carrierLabel, trackingUrlFor } from "@/lib/carriers";
 import { computeUnitCost, netOfVat } from "@/lib/costing";
-import { PAYMENT_METHOD_LABELS, PRINT_JOB_STATUS_LABELS, SALES_CHANNEL_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/domain";
+import { DOCUMENT_KIND_LABELS, PAYMENT_METHOD_LABELS, PRINT_JOB_STATUS_LABELS, SALES_CHANNEL_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/domain";
 import { averageKwhPrice } from "@/lib/energy";
 import { formatDate, formatDateShort, formatMoney, formatPercent } from "@/lib/format";
 import { deleteOrderAction, setOrderPaidAction, setOrderStatusAction } from "@/server/actions/orders";
 import { requireCompany } from "@/server/context";
+import { listOrderDocuments } from "@/server/queries/documents";
 import { getOrder } from "@/server/queries/orders";
 
 type Props = { params: Promise<{ company: string; id: string }> };
@@ -31,7 +33,7 @@ export default async function OrderPage({ params }: Props) {
   const { company: slugParam, id } = await params;
   const { company, db, org } = await requireCompany(slugParam);
   if (!z.uuid().safeParse(id).success) notFound();
-  const data = await getOrder(db, company.id, id);
+  const [data, documents] = await Promise.all([getOrder(db, company.id, id), listOrderDocuments(db, company.id, id)]);
   if (!data) notFound();
   const { order: o, items, shipments, jobs, customer } = data;
   const slug = company.slug;
@@ -232,6 +234,29 @@ export default async function OrderPage({ params }: Props) {
                 ) : (
                   <p className="mt-1 text-fg-2">Sin dirección</p>
                 )}
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Documentos" description="Factura, presupuesto o albarán con los datos de este pedido." />
+            <CardBody className="flex flex-col gap-3">
+              {documents.length === 0 ? (
+                <p className="text-sm text-fg-2">Aún no has emitido documentos para este pedido.</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5 text-sm">
+                  {documents.map((d) => (
+                    <li key={d.id} className="flex items-baseline justify-between gap-3">
+                      <Link href={`${base}/documentos/${d.id}`} className="min-w-0 truncate underline-offset-4 hover:underline">
+                        {DOCUMENT_KIND_LABELS[d.kind]} <span className="font-mono">{d.number}</span>
+                      </Link>
+                      <span className="shrink-0 font-mono text-fg-2 tabular">{formatMoney(d.totalCents)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div>
+                <NewDocumentMenu basePath={`${base}/documentos`} orderId={o.id} variant="secondary" label="Generar documento" />
               </div>
             </CardBody>
           </Card>

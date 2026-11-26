@@ -1,10 +1,11 @@
-import { Cylinder, Layers, LayoutDashboard, Package, Printer, Settings, ShoppingBag, Truck, Users, Wallet, Zap } from "lucide-react";
+import { Cylinder, Receipt, Layers, LayoutDashboard, Package, Printer, Settings, ShoppingBag, Truck, Users, Wallet, Zap } from "lucide-react";
 import type { NavItem } from "@/lib/nav";
 
 const ICONS: Record<NavItem["icon"], typeof Wallet> = {
   dashboard: LayoutDashboard,
   finance: Wallet,
   orders: ShoppingBag,
+  documents: Receipt,
   shipments: Truck,
   customers: Users,
   products: Package,

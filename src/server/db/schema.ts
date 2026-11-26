@@ -19,6 +19,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -26,6 +27,8 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   CONNECTION_TYPES,
+  DOCUMENT_KINDS,
+  DOCUMENT_STATUSES,
   ELECTRICITY_MODES,
   MACHINE_EVENT_TYPES,
   MACHINE_STATUSES,
@@ -46,6 +49,7 @@ import {
   TRANSACTION_TYPES,
   USER_ROLES,
 } from "../../lib/domain";
+import type { DocumentParty } from "../../lib/documents";
 import type { PrinterTelemetry } from "../../lib/telemetry";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -120,6 +124,38 @@ export const companies = pgTable("companies", {
   laborRateCents: integer("labor_rate_cents").notNull().default(1500), // €/hora de mano de obra
   targetMarginPct: doublePrecision("target_margin_pct").notNull().default(60),
   failureRatePct: doublePrecision("failure_rate_pct").notNull().default(5),
+
+  /* Datos fiscales del emisor (salen en facturas, presupuestos y albaranes) */
+  /** Razón social o nombre y apellidos del titular. */
+  legalName: text("legal_name"),
+  /** NIF / CIF. */
+  taxId: text("tax_id"),
+  fiscalAddressLine: text("fiscal_address_line"),
+  fiscalPostalCode: text("fiscal_postal_code"),
+  fiscalCity: text("fiscal_city"),
+  fiscalProvince: text("fiscal_province"),
+  fiscalCountry: text("fiscal_country").default("España"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  website: text("website"),
+  /** Cuenta para cobros por transferencia. */
+  iban: text("iban"),
+  /** Retención de IRPF por defecto en facturas (0 = sin retención). */
+  irpfRatePct: doublePrecision("irpf_rate_pct").notNull().default(0),
+
+  /* Series y textos de los documentos */
+  invoicePrefix: text("invoice_prefix").notNull().default("F"),
+  rectifyingPrefix: text("rectifying_prefix").notNull().default("R"),
+  quotePrefix: text("quote_prefix").notNull().default("PRE"),
+  deliveryPrefix: text("delivery_prefix").notNull().default("ALB"),
+  /** Días de validez de un presupuesto. */
+  quoteValidityDays: integer("quote_validity_days").notNull().default(30),
+  /** Días hasta el vencimiento de una factura (0 = al contado). */
+  paymentTermsDays: integer("payment_terms_days").notNull().default(0),
+  /** Condiciones que se proponen por defecto en los presupuestos. */
+  quoteTerms: text("quote_terms"),
+  /** Pie de página: inscripción registral, protección de datos… */
+  documentFooter: text("document_footer"),
 
   /**
    * Empresa creada por «Cargar datos de ejemplo»: qué empresa de demostración es
@@ -627,6 +663,112 @@ export const energyBills = pgTable(
   (t) => [index("energy_bills_company_idx").on(t.companyId, t.periodEnd)],
 );
 
+/* ============================= Documentos ============================= */
+
+/**
+ * Facturas, rectificativas, presupuestos y albaranes. Guardan una copia de los
+ * datos del emisor y del cliente tal y como estaban al emitirse: cambiar la
+ * ficha del cliente después no altera un documento ya emitido.
+ *
+ * No generan movimientos en Finanzas: el ingreso nace al cobrar el pedido.
+ */
+export const documents = pgTable(
+  "documents",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: DOCUMENT_KINDS }).notNull(),
+    status: text("status", { enum: DOCUMENT_STATUSES }).notNull().default("issued"),
+
+    /* Numeración: serie + año + secuencia («F2026-0007») */
+    series: text("series").notNull(),
+    year: integer("year").notNull(),
+    seq: integer("seq").notNull(),
+    number: text("number").notNull(),
+
+    issueDate: date("issue_date", { mode: "string" }).notNull(),
+    /** Vencimiento (facturas) o validez (presupuestos). */
+    dueDate: date("due_date", { mode: "string" }),
+
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    /** Factura que corrige una rectificativa. */
+    rectifiesId: uuid("rectifies_id").references((): AnyPgColumn => documents.id, { onDelete: "set null" }),
+    rectificationReason: text("rectification_reason"),
+
+    issuer: jsonb("issuer").$type<DocumentParty>().notNull(),
+    customer: jsonb("customer").$type<DocumentParty>().notNull(),
+
+    /** true: los precios de las líneas llevan el IVA incluido (como los pedidos). */
+    pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
+    /** Albaranes: mostrar o no los importes. */
+    showPrices: boolean("show_prices").notNull().default(true),
+    vatRatePct: doublePrecision("vat_rate_pct").notNull().default(21),
+    irpfRatePct: doublePrecision("irpf_rate_pct").notNull().default(0),
+
+    /* Importes en céntimos (ver `lib/documents` → computeDocumentTotals) */
+    subtotalCents: integer("subtotal_cents").notNull().default(0),
+    discountCents: integer("discount_cents").notNull().default(0),
+    shippingCents: integer("shipping_cents").notNull().default(0),
+    baseCents: integer("base_cents").notNull().default(0),
+    vatCents: integer("vat_cents").notNull().default(0),
+    /** Base + IVA. */
+    totalCents: integer("total_cents").notNull().default(0),
+    irpfCents: integer("irpf_cents").notNull().default(0),
+    /** Total − retención de IRPF. */
+    amountDueCents: integer("amount_due_cents").notNull().default(0),
+
+    paymentMethod: text("payment_method", { enum: PAYMENT_METHODS }),
+    /** Observaciones visibles en el documento. */
+    notes: text("notes"),
+    /** Condiciones (presupuestos) o forma de pago. */
+    terms: text("terms"),
+    footer: text("footer"),
+
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("documents_company_kind_idx").on(t.companyId, t.kind, t.issueDate),
+    index("documents_order_idx").on(t.orderId),
+    uniqueIndex("documents_number_idx").on(t.companyId, t.kind, t.year, t.seq),
+  ],
+);
+
+export const documentItems = pgTable(
+  "document_items",
+  {
+    id: id(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    description: text("description").notNull(),
+    /** Admite decimales (horas de diseño) y negativos en rectificativas. */
+    quantity: doublePrecision("quantity").notNull().default(1),
+    unitPriceCents: integer("unit_price_cents").notNull().default(0),
+    totalCents: integer("total_cents").notNull().default(0),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("document_items_document_idx").on(t.documentId)],
+);
+
+/** Último número usado por empresa, tipo de documento y año. */
+export const documentSequences = pgTable(
+  "document_sequences",
+  {
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: DOCUMENT_KINDS }).notNull(),
+    year: integer("year").notNull(),
+    lastSeq: integer("last_seq").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.kind, t.year] })],
+);
+
 /* ============================== Relaciones ============================== */
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -638,6 +780,7 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   shipments: many(shipments),
   transactions: many(transactions),
   printJobs: many(printJobs),
+  documents: many(documents),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -734,3 +877,5 @@ export type PrintJob = typeof printJobs.$inferSelect;
 export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type EnergyBill = typeof energyBills.$inferSelect;
+export type DocumentRow = typeof documents.$inferSelect;
+export type DocumentItem = typeof documentItems.$inferSelect;

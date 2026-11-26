@@ -129,6 +129,18 @@ export function formatDate(value: DateInput, timeZone = DEFAULT_TIME_ZONE): stri
   if (!d) return "—";
   return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric", timeZone }).format(d);
 }
+/** «25 de noviembre de 2026» (contratos) */
+export function formatDateLong(value: DateInput, timeZone = DEFAULT_TIME_ZONE): string {
+  const d = toDate(value);
+  if (!d) return "—";
+  return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", year: "numeric", timeZone }).format(d);
+}
+/** «25/11/2026» (documentos impresos) */
+export function formatDateNumeric(value: DateInput, timeZone = DEFAULT_TIME_ZONE): string {
+  const d = toDate(value);
+  if (!d) return "—";
+  return new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "2-digit", year: "numeric", timeZone }).format(d);
+}
 /** «25 nov» */
 export function formatDateShort(value: DateInput, timeZone = DEFAULT_TIME_ZONE): string {
   const d = toDate(value);

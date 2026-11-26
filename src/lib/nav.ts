@@ -7,6 +7,7 @@ export interface NavItem {
     | "dashboard"
     | "finance"
     | "orders"
+    | "documents"
     | "shipments"
     | "customers"
     | "products"
@@ -29,6 +30,7 @@ export const COMPANY_NAV: NavGroup[] = [
       { segment: "", label: "Resumen", icon: "dashboard" },
       { segment: "finanzas", label: "Finanzas", icon: "finance" },
       { segment: "pedidos", label: "Pedidos", icon: "orders" },
+      { segment: "documentos", label: "Documentos", icon: "documents" },
       { segment: "envios", label: "Envíos", icon: "shipments" },
       { segment: "clientes", label: "Clientes", icon: "customers" },
       { segment: "productos", label: "Productos", icon: "products" },

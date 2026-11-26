@@ -58,7 +58,9 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-:root[data-theme="light"] {
+:root[data-theme="light"],
+/* Papel de documentos (facturas, contratos): siempre claro, en cualquier tema. */
+.theme-light {
   color-scheme: light;
 
   --bg: #ffffff;
@@ -231,5 +233,34 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Impresión (facturas, presupuestos, albaranes, contratos)
+------------------------------------------------------------------- */
+@page {
+  size: A4;
+  margin: 14mm 14mm 16mm;
+}
+
+@media print {
+  html,
+  body {
+    background: transparent !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .paper {
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .paper table tr,
+  .paper .avoid-break {
+    break-inside: avoid;
   }
 }

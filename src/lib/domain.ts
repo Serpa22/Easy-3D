@@ -354,3 +354,48 @@ export const TARIFF_PERIOD_LABELS: Record<TariffPeriod, string> = {
   flat: "Llano",
   valley: "Valle",
 };
+
+/* ----------------------------- Documentos ----------------------------- */
+
+/** Documentos comerciales que emite una sub-empresa. */
+export const DOCUMENT_KINDS = ["invoice", "rectifying", "quote", "delivery_note"] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
+  invoice: "Factura",
+  rectifying: "Factura rectificativa",
+  quote: "Presupuesto",
+  delivery_note: "Albarán",
+};
+/** Plural, para pestañas y listados. */
+export const DOCUMENT_KIND_PLURAL: Record<DocumentKind, string> = {
+  invoice: "Facturas",
+  rectifying: "Rectificativas",
+  quote: "Presupuestos",
+  delivery_note: "Albaranes",
+};
+/** Prefijo de serie por defecto («F2026-0001»). */
+export const DOCUMENT_DEFAULT_PREFIX: Record<DocumentKind, string> = {
+  invoice: "F",
+  rectifying: "R",
+  quote: "PRE",
+  delivery_note: "ALB",
+};
+/** Documentos con numeración fiscal: no se borran salvo el último de su serie. */
+export const FISCAL_DOCUMENT_KINDS: readonly DocumentKind[] = ["invoice", "rectifying"];
+
+/** Estado de un documento. Solo los presupuestos pasan a aceptado o rechazado. */
+export const DOCUMENT_STATUSES = ["issued", "accepted", "rejected"] as const;
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
+export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
+  issued: "Emitido",
+  accepted: "Aceptado",
+  rejected: "Rechazado",
+};
+/** Cómo se lee el estado en un presupuesto. */
+export const QUOTE_STATUS_LABELS: Record<DocumentStatus, string> = {
+  issued: "Pendiente",
+  accepted: "Aceptado",
+  rejected: "Rechazado",
+};
+/** Presupuesto pendiente cuya validez ya pasó. */
+export const QUOTE_EXPIRED_LABEL = "Caducado";

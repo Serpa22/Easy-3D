@@ -152,3 +152,19 @@ test("sin JavaScript, enviar el acceso no deja la contraseña en la URL", async 
   expect(plain.url()).not.toContain("password");
   await context.close();
 });
+
+test("documentos: factura desde un pedido, rectificativa y vista de impresión", async () => {
+  await page.goto("/e/teclas/pedidos?estado=todos");
+  await page.locator("tbody tr a").first().click();
+  await page.getByRole("button", { name: "Generar documento" }).click();
+  await page.getByRole("menuitem", { name: "Factura", exact: true }).click();
+  await page.getByRole("button", { name: "Emitir factura" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /^Factura F\d{4}-0001$/ })).toBeVisible();
+  await page.getByRole("link", { name: "Rectificar" }).click();
+  await page.getByLabel("Motivo").fill("Devolución");
+  await page.getByRole("button", { name: "Emitir factura rectificativa" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /^Factura rectificativa R\d{4}-0001$/ })).toBeVisible();
+  await page.getByRole("link", { name: "Imprimir o PDF" }).click();
+  await expect(page.getByRole("button", { name: "Imprimir o guardar PDF" })).toBeVisible();
+  await expect(page.getByText("Rectifica la factura")).toBeVisible();
+});

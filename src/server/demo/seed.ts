@@ -293,6 +293,16 @@ async function seedCompany(tx: Tx, spec: CompanySpec, today: string, timeZone: s
       kwhPricePeak: 0.224,
       kwhPriceFlat: 0.152,
       kwhPriceValley: 0.098,
+      // Datos fiscales ficticios para que los documentos de ejemplo salgan completos.
+      legalName: `${base.name} Estudio 3D, S.L.`,
+      taxId: "B00000000",
+      fiscalAddressLine: "Calle del Taller, 12, bajos",
+      fiscalPostalCode: "08012",
+      fiscalCity: "Barcelona",
+      fiscalProvince: "Barcelona",
+      contactEmail: `hola@${spec.slug}.example`,
+      quoteTerms: "Plazo de fabricación: 7 días hábiles desde la aceptación. Anticipo del 50 % al confirmar el encargo. Tolerancia dimensional ±0,3 mm; las líneas de capa son propias del proceso.",
+      documentFooter: "Empresa de demostración. Datos fiscales ficticios.",
     })
     .where(eq(companies.id, base.id))
     .returning();
