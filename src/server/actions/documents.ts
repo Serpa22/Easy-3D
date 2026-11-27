@@ -6,7 +6,8 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult, ActionState } from "@/lib/action";
 import { DOCUMENT_KIND_LABELS, DOCUMENT_STATUSES } from "@/lib/domain";
-import { zDecimal, zInt, zOptionalText } from "@/lib/validation";
+import { DEFAULT_DOC_ACCENT } from "@/lib/documents";
+import { zDecimal, zInt, zOptionalColor, zOptionalText } from "@/lib/validation";
 import { ActionError, parseForm, parseInput, runAction } from "@/server/action";
 import { requireCompany } from "@/server/context";
 import { companies } from "@/server/db/schema";
@@ -83,6 +84,7 @@ const seriesSchema = z.object({
   paymentTermsDays: zInt({ min: 0, max: 365 }),
   quoteTerms: zOptionalText(4000),
   documentFooter: zOptionalText(1000),
+  brandColor: zOptionalColor(),
 });
 
 export async function saveDocumentSettingsAction(slug: string, _prev: ActionState, formData: FormData): Promise<ActionResult> {
@@ -93,7 +95,10 @@ export async function saveDocumentSettingsAction(slug: string, _prev: ActionStat
     if (new Set(prefixes).size !== prefixes.length) {
       throw new ActionError("Cada tipo de documento necesita su propia serie.", { rectifyingPrefix: "Las cuatro series deben ser distintas" });
     }
-    await db.update(companies).set(input).where(eq(companies.id, company.id));
+    await db
+      .update(companies)
+      .set({ ...input, brandColor: input.brandColor ?? DEFAULT_DOC_ACCENT })
+      .where(eq(companies.id, company.id));
     revalidatePath(`/e/${slug}`, "layout");
     return { message: "Series y textos guardados" };
   });

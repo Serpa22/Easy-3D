@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { documentItems, documents, orderItems, orders } from "@/server/db/schema";
-import { computeDocumentTotals, formatDocumentNumber } from "@/lib/documents";
+import { accentTokens, computeDocumentTotals, contrastRatio, formatDocumentNumber, titleSize, totalSize, typographicMinus } from "@/lib/documents";
 import { nextOrderNumber } from "@/server/domain/companies";
 import { deleteDocument, documentInputSchema, draftFromDocument, draftFromOrder, saveDocument, setQuoteStatus } from "@/server/domain/documents-service";
 import { freshDb, makeCompany } from "../helpers/db";
@@ -51,6 +51,48 @@ describe("totales de documentos", () => {
 
   it("formatea el número", () => {
     expect(formatDocumentNumber("F", 2026, 7)).toBe("F2026-0007");
+  });
+});
+
+describe("presentación de la hoja", () => {
+  it("el titular se ajusta al texto", () => {
+    expect(titleSize("Factura")).toEqual({ size: "xl", lines: ["Factura"] });
+    expect(titleSize("Albarán").size).toBe("xl");
+    expect(titleSize("Presupuesto")).toEqual({ size: "lg", lines: ["Presupuesto"] });
+    expect(titleSize("Factura rectificativa")).toEqual({ size: "md", lines: ["Factura", "rectificativa"] });
+    expect(titleSize("Anticonstitucional").size).toBe("md");
+  });
+
+  it("el rojo de marca se usa tal cual, como texto y como fondo", () => {
+    expect(accentTokens("#E30613")).toEqual({ accent: "#e30613", ink: "#e30613", inkSmall: "#e30613", fg: "#ffffff" });
+    expect(contrastRatio("#ffffff", "#e30613")).toBeGreaterThan(4.5);
+  });
+
+  it("un acento claro no se usa como texto ni lleva texto blanco encima", () => {
+    expect(accentTokens("#ffd400")).toEqual({ accent: "#ffd400", ink: "#0a0a0a", inkSmall: "#0a0a0a", fg: "#0a0a0a" });
+    // Naranja (≈3,4:1): vale para el número de 25 pt, pero no para los ordinales ni con blanco encima.
+    for (const orange of ["#e8590c", "#f05a00"]) {
+      expect(accentTokens(orange)).toEqual({ accent: orange, ink: orange, inkSmall: "#0a0a0a", fg: "#0a0a0a" });
+    }
+  });
+
+  it("el importe del total baja de cuerpo a partir de siete cifras", () => {
+    expect(totalSize("999.999,99 €")).toBe("normal");
+    expect(totalSize("−23,40 €")).toBe("normal");
+    expect(totalSize("1.309.345,07 €")).toBe("largo");
+    expect(totalSize("123.456.789,00 €")).toBe("xlargo");
+  });
+
+  it("los negativos llevan el signo menos tipográfico", () => {
+    expect(typographicMinus("-18,90 €")).toBe("−18,90 €");
+    expect(typographicMinus("18,90 €")).toBe("18,90 €");
+    expect(typographicMinus("−5,00 €")).toBe("−5,00 €");
+  });
+
+  it("solo acepta #RRGGBB: lo demás cae al color por defecto", () => {
+    for (const bad of [null, undefined, "", "red", "#fff", "#e30613;background:url(x)", "var(--x)"]) {
+      expect(accentTokens(bad).accent).toBe("#e30613");
+    }
   });
 });
 

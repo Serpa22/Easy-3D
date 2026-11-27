@@ -59,7 +59,8 @@ export default async function ContractPage({ params, searchParams }: Props) {
         </Alert>
       ) : null}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
+      {/* La hoja mide 210 mm fijos: va al lado del formulario solo cuando cabe entera (≥ 1420 px); si no, debajo. */}
+      <div className="grid items-start gap-4 min-[1420px]:grid-cols-[minmax(18rem,24rem)_210mm]">
         <Card>
           <CardHeader title="Datos del contrato" description="Los huecos que dejes vacíos saldrán como una línea para rellenar a mano." />
           <CardBody>
@@ -77,7 +78,7 @@ export default async function ContractPage({ params, searchParams }: Props) {
                   </Select>
                 </Field>
               ) : null}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 min-[1420px]:grid-cols-1">
                 <Field label="Fecha" name="fecha">
                   <DateInput defaultValue={req.date} />
                 </Field>
@@ -105,7 +106,7 @@ export default async function ContractPage({ params, searchParams }: Props) {
           </CardBody>
         </Card>
 
-        <ContractPaper contract={contract} />
+        <ContractPaper contract={contract} brand={{ name: company.name, accent: company.brandColor, contact: [company.website, company.contactEmail, company.contactPhone] }} />
       </div>
     </>
   );

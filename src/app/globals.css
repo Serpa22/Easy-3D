@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Tipografía de la hoja de documentos (solo se descarga donde hay una `.paper`). */
+@import "@fontsource-variable/archivo/wdth.css";
 
 /* ------------------------------------------------------------------
    Easy 3D — sistema de diseño monocromo (negro / blanco)
@@ -237,30 +239,616 @@
 }
 
 /* ------------------------------------------------------------------
+   Hoja de documentos (`.paper`): identidad de marca de la empresa.
+   Es la ÚNICA zona con color de marca; los tokens `--doc-*` no se
+   registran en @theme para que no se filtren al resto de la app.
+   Medidas en mm/pt: es un A4.
+------------------------------------------------------------------- */
+.paper-frame {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 210mm;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 0 0 1px var(--color-line),
+    var(--shadow-pop);
+}
+
+.paper {
+  --doc-accent: #e30613; /* por sub-empresa: se inyecta con style */
+  --doc-accent-deep: color-mix(in srgb, var(--doc-accent) 74%, #000); /* canto */
+  --doc-accent-fg: #fff; /* texto sobre el acento */
+  --doc-accent-ink: var(--doc-accent); /* acento como texto grande (número): ≥ 3:1 */
+  --doc-accent-ink-sm: var(--doc-accent-ink); /* acento como texto normal (ordinales): ≥ 4.5:1 */
+  --doc-ink: #0a0a0a;
+  --doc-ink-2: #3d3d3d;
+  --doc-ink-3: #5e5e5e;
+  --doc-rule: #c4c4c4;
+  --doc-paper: #fff;
+  --doc-font: "Archivo Variable", "Arial Narrow", Arial, sans-serif;
+  --doc-r-sm: 1.5pt;
+  --doc-r-md: 1.7mm;
+  --doc-r-lg: 3.2mm;
+  --doc-g: 4mm;
+
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 12mm 15mm 14mm;
+  background: var(--doc-paper);
+  color: var(--doc-ink);
+  font-family: var(--doc-font);
+  font-size: 9pt;
+  font-weight: 400;
+  font-stretch: 100%;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.paper .doc-col12 {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: var(--doc-g);
+}
+
+/* Rótulo: mayúsculas con tracking + cuadradito-tecla */
+.paper .doc-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  font-size: 6.4pt;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.paper .doc-rotulo::before {
+  content: "";
+  flex: none;
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: var(--doc-r-sm);
+  background: var(--doc-accent);
+  border-bottom: 1pt solid var(--doc-accent-deep);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.paper .doc-rotulo--liso {
+  color: var(--doc-ink-3);
+}
+.paper .doc-rotulo--liso::before {
+  display: none;
+}
+
+/* Cabecera: tecla + nombre comercial, y contacto */
+.paper .doc-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6mm;
+}
+.paper .doc-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.4mm;
+  min-width: 0;
+}
+.paper .doc-marca__tecla {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 6.4mm;
+  height: 6.9mm;
+  border-radius: var(--doc-r-md);
+  background: var(--doc-accent);
+  border-bottom: 1mm solid var(--doc-accent-deep);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.paper .doc-marca__tecla::after {
+  content: "";
+  width: 2.5mm;
+  height: 2.4mm;
+  border-radius: 0.5mm;
+  background: var(--doc-accent-fg);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.paper .doc-marca__nombre {
+  font-size: 18pt;
+  font-weight: 900;
+  font-stretch: 68%;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  word-spacing: 0.08em; /* el espacio de Archivo condensada es muy estrecho */
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.paper .doc-cab__dcha {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 1mm 6mm;
+  font-size: 6.4pt;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Titular del tipo de documento + número */
+.paper .doc-titular {
+  font-weight: 900;
+  font-stretch: 62%;
+  line-height: 0.86;
+  letter-spacing: -0.005em;
+  word-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.paper .doc-titular > span {
+  display: block;
+}
+.paper .doc-titular--xl {
+  font-size: 74pt;
+}
+.paper .doc-titular--lg {
+  font-size: 52pt;
+}
+.paper .doc-titular--md {
+  font-size: 40pt;
+  line-height: 0.88;
+}
+.paper .doc-portada {
+  align-items: end;
+  margin-top: 12mm;
+  padding-bottom: 4.5mm;
+  border-bottom: 2.2pt solid var(--doc-ink);
+}
+.paper .doc-portada .doc-titular {
+  grid-column: 1 / span 8;
+  margin-bottom: -0.06em;
+  margin-left: -0.035em;
+}
+.paper .doc-portada__num {
+  display: grid;
+  grid-column: 9 / span 4;
+  gap: 1.6mm;
+  padding-bottom: 0.4mm;
+}
+.paper .doc-portada__num strong {
+  color: var(--doc-accent-ink);
+  font-size: 25pt;
+  font-weight: 900;
+  font-stretch: 62%;
+  line-height: 0.9;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+/* Franja de datos */
+.paper .doc-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--doc-g) 10mm;
+  padding: 3.2mm 0 3.4mm;
+  border-bottom: 0.6pt solid var(--doc-ink);
+}
+.paper .doc-datos > div {
+  display: grid;
+  align-content: start;
+  gap: 1.3mm;
+  min-width: 22mm;
+}
+.paper .doc-dato {
+  font-size: 10.5pt;
+  font-weight: 700;
+  font-stretch: 88%;
+  line-height: 1.15;
+}
+
+/* Partes */
+.paper .doc-partes {
+  padding: 6mm 0 7mm;
+}
+.paper .doc-parte {
+  display: grid;
+  grid-column: span 6;
+  align-content: start;
+  gap: 1.8mm;
+  min-width: 0;
+}
+.paper .doc-partes--3 > .doc-parte {
+  grid-column: span 4;
+}
+.paper .doc-parte__nombre {
+  margin-top: 0.6mm;
+  font-size: 12.5pt;
+  font-weight: 800;
+  font-stretch: 78%;
+  line-height: 1.05;
+  word-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.paper .doc-parte p:not(.doc-parte__nombre) {
+  color: var(--doc-ink-2);
+  font-size: 8.6pt;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+.paper .doc-nowrap {
+  white-space: nowrap;
+}
+.paper .doc-parte b {
+  color: var(--doc-ink);
+  font-weight: 600;
+}
+
+/* Tabla de líneas */
+.paper .doc-lineas {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 2.2pt solid var(--doc-ink);
+  border-bottom: 2.2pt solid var(--doc-ink);
+}
+.paper .doc-lineas th {
+  padding: 2.3mm 0 2.1mm;
+  border-bottom: 0.6pt solid var(--doc-ink);
+  font-size: 6.4pt;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.paper .doc-lineas th small {
+  color: var(--doc-ink-3);
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.paper .doc-lineas td {
+  padding: 2.9mm 0 2.7mm;
+  border-top: 0.5pt solid var(--doc-rule);
+  vertical-align: top;
+}
+.paper .doc-lineas tbody tr:first-child td {
+  border-top: 0;
+}
+.paper .doc-lineas tr {
+  break-inside: avoid;
+}
+.paper .doc-lineas .doc-n {
+  padding-left: 5mm;
+  text-align: right;
+  white-space: nowrap;
+}
+.paper .doc-lineas td.doc-n {
+  padding-top: 3.1mm;
+  font-size: 9.4pt;
+}
+.paper .doc-lineas .doc-ord {
+  width: 10mm;
+  color: var(--doc-accent-ink-sm);
+  font-size: 13pt;
+  font-weight: 900;
+  font-stretch: 62%;
+  line-height: 1.05;
+}
+.paper .doc-lineas .doc-concepto {
+  overflow-wrap: anywhere;
+}
+.paper .doc-lineas .doc-concepto b {
+  display: block;
+  font-size: 9.6pt;
+  font-weight: 700;
+  font-stretch: 92%;
+  line-height: 1.25;
+}
+.paper .doc-lineas .doc-concepto span {
+  display: block;
+  margin-top: 0.4mm;
+  color: var(--doc-ink-2);
+  font-size: 8pt;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+.paper .doc-lineas td.doc-imp {
+  font-weight: 700;
+}
+
+/* Cierre: pago y observaciones a la izquierda, sumas y total a la derecha */
+.paper .doc-cierre {
+  align-items: start;
+  margin-top: 6mm;
+}
+.paper .doc-cierre__izq {
+  display: grid;
+  grid-column: 1 / span 6;
+  gap: 5mm;
+  min-width: 0;
+}
+.paper .doc-cierre__dcha {
+  grid-column: 8 / span 5;
+}
+.paper .doc-bloque {
+  display: grid;
+  gap: 1.6mm;
+}
+.paper .doc-bloque p {
+  color: var(--doc-ink-2);
+  font-size: 8.6pt;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.paper .doc-bloque p.doc-iban {
+  color: var(--doc-ink);
+  font-size: 11.5pt;
+  font-weight: 700;
+  font-stretch: 88%;
+  letter-spacing: 0.02em;
+}
+.paper .doc-sumas {
+  display: grid;
+  grid-template-columns: 1fr auto;
+}
+.paper .doc-sumas dt,
+.paper .doc-sumas dd {
+  padding: 1.55mm 0;
+  border-bottom: 0.5pt solid var(--doc-rule);
+}
+.paper .doc-sumas dd {
+  padding-left: 5mm;
+  text-align: right;
+  white-space: nowrap;
+}
+.paper .doc-sumas .doc-base {
+  margin-top: -0.5pt;
+  border-top: 0.6pt solid var(--doc-ink);
+  border-bottom: 0.6pt solid var(--doc-ink);
+  font-weight: 700;
+}
+.paper .doc-sumas > :first-child,
+.paper .doc-sumas > :first-child + dd {
+  margin-top: 0;
+}
+
+/* Total: tecla con canto. Único bloque de color de la hoja */
+.paper .doc-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4mm;
+  margin-top: 4mm;
+  padding: 3.4mm 4.4mm 3mm;
+  border-bottom: 1.7mm solid var(--doc-accent-deep);
+  border-radius: var(--doc-r-lg);
+  background: var(--doc-accent);
+  color: var(--doc-accent-fg);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.paper .doc-total dt {
+  font-size: 6.8pt;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.paper .doc-total dt > span {
+  display: block;
+}
+.paper .doc-total dd {
+  font-size: 30pt;
+  font-weight: 900;
+  font-stretch: 62%;
+  line-height: 0.9;
+  white-space: nowrap;
+}
+/* Importes de siete cifras o más: el cuerpo baja para que quepan en la tecla
+   (`totalSize()`); si aun así no cabe, la etiqueta sube encima. */
+.paper .doc-total {
+  flex-wrap: wrap;
+  row-gap: 1.6mm;
+}
+.paper .doc-total dd {
+  margin-left: auto;
+}
+.paper .doc-total--largo dd {
+  font-size: 24pt;
+}
+.paper .doc-total--xlargo dd {
+  font-size: 19pt;
+}
+/* Variante de ahorro de tinta (no se usa por defecto). */
+.paper .doc-total--contorno {
+  border: 1.2pt solid var(--doc-ink);
+  border-bottom: 1.7mm solid var(--doc-ink);
+  background: none;
+  color: var(--doc-ink);
+}
+
+/* Firmas: teclas en contorno (borde negro, canto gris), sin relleno */
+.paper .doc-firmas {
+  margin-top: 9mm;
+}
+.paper .doc-firma {
+  display: grid;
+  grid-column: span 6;
+  gap: 1mm;
+  padding: 3mm 4mm 2.6mm;
+  border: 0.8pt solid var(--doc-ink);
+  border-bottom: 1.4mm solid var(--doc-rule);
+  border-radius: var(--doc-r-lg);
+}
+.paper .doc-firma__hueco {
+  height: 17mm;
+  border-bottom: 0.6pt solid var(--doc-ink);
+}
+.paper--contrato .doc-firma__hueco {
+  height: 22mm;
+}
+.paper .doc-firma__quien {
+  margin-top: 1.4mm;
+  font-size: 10.4pt;
+  font-weight: 800;
+  font-stretch: 78%;
+  line-height: 1.1;
+  word-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.paper .doc-firma__nota {
+  color: var(--doc-ink-3);
+  font-size: 7.6pt;
+}
+
+/* Pie: pegado abajo si la hoja cabe en una página */
+.paper .doc-pie {
+  margin-top: auto;
+  padding-top: 10mm;
+}
+.paper .doc-pie p {
+  padding-top: 2.6mm;
+  border-top: 0.6pt solid var(--doc-ink);
+  color: var(--doc-ink-3);
+  font-size: 6.8pt;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+/* Contrato */
+.paper.paper--contrato {
+  padding-inline: 21mm; /* medida de lectura ≈ 95 caracteres */
+}
+.paper .doc-contrato__titulo {
+  max-width: 150mm;
+  margin-top: 9mm;
+  font-size: 34pt;
+  line-height: 0.9;
+  text-wrap: balance;
+}
+.paper .doc-contrato__titulo--filete {
+  max-width: none;
+  padding-bottom: 4mm;
+  border-bottom: 2.2pt solid var(--doc-ink);
+}
+.paper .doc-contrato__fecha {
+  margin-top: 4mm;
+  padding-top: 2.6mm;
+  border-top: 2.2pt solid var(--doc-ink);
+  font-size: 9.5pt;
+  font-weight: 600;
+}
+.paper .doc-contrato__fecha--final {
+  margin-top: 7mm;
+  padding-top: 0;
+  border-top: 0;
+}
+.paper .doc-legal {
+  margin-top: 5mm;
+}
+.paper .doc-legal p {
+  margin-top: 1.9mm;
+  font-size: 9.5pt;
+  line-height: 1.5;
+  text-align: justify;
+  hyphens: auto;
+  orphans: 2;
+  widows: 2;
+  break-inside: avoid; /* párrafos de 2–4 líneas: Chromium no respeta widows aquí */
+}
+.paper .doc-legal--cierre {
+  margin-top: 0;
+}
+.paper .doc-legal p b {
+  font-weight: 700;
+}
+.paper .doc-seccion {
+  gap: 3mm;
+  margin-top: 6mm;
+  break-after: avoid;
+}
+.paper .doc-seccion::after {
+  content: "";
+  flex: 1;
+  border-top: 0.6pt solid var(--doc-ink);
+}
+.paper .doc-clausula {
+  margin-top: 5mm;
+  font-size: 11pt;
+  font-weight: 800;
+  font-stretch: 78%;
+  line-height: 1.1;
+  word-spacing: 0.08em;
+  text-transform: uppercase;
+  break-after: avoid;
+}
+.paper .doc-clausula > span {
+  color: var(--doc-accent-ink-sm);
+}
+
+/* ------------------------------------------------------------------
    Impresión (facturas, presupuestos, albaranes, contratos)
 ------------------------------------------------------------------- */
 @page {
   size: A4;
-  margin: 14mm 14mm 16mm;
+  margin: 12mm 15mm 14mm;
+  /* Chromium ≥ 131; Firefox y Safari lo ignoran sin romper nada. */
+  @bottom-right {
+    content: "Página " counter(page) " de " counter(pages);
+    font:
+      700 6.2pt "Archivo Variable",
+      Arial,
+      sans-serif;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #0a0a0a;
+  }
 }
 
 @media print {
+  /* La hoja se imprime siempre en claro: con el tema oscuro, `color-scheme: dark`
+     pintaría de negro el lienzo (márgenes incluidos) al activar los gráficos de fondo. */
+  :root {
+    color-scheme: light !important;
+  }
   html,
   body {
-    background: transparent !important;
+    background: #fff !important;
   }
   .no-print {
     display: none !important;
   }
-  .paper {
-    box-shadow: none !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
+  .paper-frame {
+    position: static !important;
+    overflow: visible !important;
     max-width: none !important;
+    border-radius: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
   }
+  /* 268mm = 297 − 12 − 14 − 3 de holgura: el pie queda abajo si cabe en una hoja.
+     No subas ese valor ni añadas márgenes fuera de la hoja: saldría una página en blanco. */
+  .paper {
+    width: auto;
+    min-height: 268mm;
+    padding: 0;
+  }
+  .paper.paper--contrato {
+    padding-inline: 6mm;
+  }
+  /* Menos aire sobre el pie: que una hoja casi llena no lo mande solo a otra página. */
+  .paper .doc-pie {
+    padding-top: 5mm;
+  }
+  /* El cierre puede partirse entre bloques; cada bloque y las sumas con su tecla, no. */
   .paper table tr,
-  .paper .avoid-break {
+  .paper .avoid-break,
+  .paper .doc-bloque,
+  .paper .doc-cierre__dcha {
     break-inside: avoid;
   }
 }

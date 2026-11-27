@@ -1,0 +1,1 @@
+ALTER TABLE "companies" ADD COLUMN "brand_color" text DEFAULT '#e30613' NOT NULL;

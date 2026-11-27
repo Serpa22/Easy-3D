@@ -4,7 +4,7 @@ import { Archive, Trash2 } from "lucide-react";
 import { FormDialogButton } from "@/components/ui/actions";
 import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui/display";
 import { ConfirmButton } from "@/components/ui/dialog";
-import { ActionForm, Field, Input, MoneyInput, NumberInput, SubmitButton, Textarea } from "@/components/ui/form";
+import { ActionForm, ColorInput, Field, Input, MoneyInput, NumberInput, SubmitButton, Textarea } from "@/components/ui/form";
 import { ELECTRICITY_MODE_LABELS } from "@/lib/domain";
 import { todayISO } from "@/lib/dates";
 import { formatDocumentNumber } from "@/lib/documents";
@@ -154,6 +154,9 @@ export default async function CompanySettingsPage({ params }: { params: Promise<
             </Field>
             <Field label="Pie de página" name="documentFooter" hint="Inscripción en el Registro Mercantil, aviso de protección de datos…">
               <Textarea defaultValue={company.documentFooter ?? ""} rows={3} maxLength={1000} />
+            </Field>
+            <Field label="Color de marca en documentos" name="brandColor" hint="Acento de facturas, presupuestos, albaranes y contratos: logotipo, número y total. El resto de la hoja va en negro sobre blanco.">
+              <ColorInput defaultValue={company.brandColor} />
             </Field>
             <div>
               <SubmitButton>Guardar documentos</SubmitButton>

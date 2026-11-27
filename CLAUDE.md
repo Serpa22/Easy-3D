@@ -104,7 +104,10 @@ Antes de dar algo por terminado: `npm run typecheck`, `npm run lint`, `npm test`
 - Facturas, rectificativas, presupuestos y albaranes en `documents` (+ `document_items`, `document_sequences`). Lógica en `domain/documents-service.ts`, cálculo de importes en `lib/documents.ts` (`computeDocumentTotals`, compartido con el formulario).
 - Numeración correlativa por empresa, tipo y año; en facturas y rectificativas la fecha respeta el orden de la serie y solo se borra la última. Guardan copia de emisor y cliente (`issuer`/`customer`). No tocan Finanzas ni stock.
 - Plantillas de contrato en `lib/contract-templates.ts`: un único texto para la app y para los Word de `public/plantillas/` (regenerar con `scripts/export-contracts.ts` + `scripts/build-contract-docx.py`).
-- La hoja impresa usa `.paper.theme-light` (tokens claros en cualquier tema) y las reglas `@media print` de `globals.css`.
+- La hoja (`Paper`, `DocumentPaper`, `ContractPaper`) lleva la identidad de la empresa y es la **única excepción al monocromo**: el color de marca solo existe dentro de `.paper`, mediante los tokens `--doc-*` y las clases `.doc-*` de `globals.css` (no están en `@theme`; no los uses fuera). Tipografía «Archivo Variable» (`@fontsource-variable/archivo`, eje de anchura con `font-stretch`). Sin hex en los componentes.
+- El acento es `companies.brandColor` (Ajustes → Documentos); se lee de la empresa al pintar, no se copia en el documento, y pasa siempre por `accentTokens()` de `lib/documents.ts` (valida #RRGGBB y cuida el contraste). Acento solo en logotipo, cuadraditos, número, ordinales y tecla del total; filetes en negro o gris; nada a sangre.
+- La hoja está maquetada en mm/pt (A4): en pantallas estrechas se desplaza dentro de su marco `.paper-frame`. En las páginas `(print)` va con `standalone` (su titular es el `h1`); dentro de la app los encabezados bajan un nivel. Impresión: `@page` y `@media print` de `globals.css` (`min-height: 268mm` pega el pie abajo; no añadas márgenes fuera de la hoja). Se imprime siempre en claro (`color-scheme: light` en `@media print`).
+- Los Word nombran Arial / Arial Narrow (fuentes de sistema; Archivo solo con `--body-font` / `--display-font`) y se generan de forma determinista.
 
 ## Impresoras
 

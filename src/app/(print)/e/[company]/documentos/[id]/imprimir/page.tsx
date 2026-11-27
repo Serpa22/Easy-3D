@@ -25,8 +25,8 @@ export default async function PrintDocumentPage({ params }: Props) {
   if (!data) notFound();
   return (
     <>
-      <PrintToolbar backHref={`/e/${company.slug}/documentos/${data.doc.id}`} backLabel={`Volver a ${data.doc.number}`} hint="En el diálogo, elige «Guardar como PDF» para obtener el archivo." />
-      <DocumentPaper doc={data.doc} items={data.items} rectifies={data.rectifies} order={data.order} />
+      <PrintToolbar backHref={`/e/${company.slug}/documentos/${data.doc.id}`} backLabel={`Volver a ${data.doc.number}`} hint="En el diálogo: «Guardar como PDF», sin encabezados ni pies." />
+      <DocumentPaper doc={data.doc} items={data.items} brandName={company.name} accent={company.brandColor} rectifies={data.rectifies} order={data.order} standalone />
     </>
   );
 }

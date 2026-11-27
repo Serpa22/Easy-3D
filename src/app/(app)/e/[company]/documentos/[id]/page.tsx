@@ -89,7 +89,7 @@ export default async function DocumentPage({ params }: Props) {
       ) : null}
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <DocumentPaper doc={doc} items={items} rectifies={rectifies} order={order} />
+        <DocumentPaper doc={doc} items={items} brandName={company.name} accent={company.brandColor} rectifies={rectifies} order={order} />
 
         <div className="flex flex-col gap-4">
           <Card>

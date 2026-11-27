@@ -156,6 +156,8 @@ export const companies = pgTable("companies", {
   quoteTerms: text("quote_terms"),
   /** Pie de página: inscripción registral, protección de datos… */
   documentFooter: text("document_footer"),
+  /** Color de marca (#RRGGBB) de la hoja de documentos y contratos. Es presentación: se lee al pintar, no se copia en cada documento. */
+  brandColor: text("brand_color").notNull().default("#e30613"),
 
   /**
    * Empresa creada por «Cargar datos de ejemplo»: qué empresa de demostración es

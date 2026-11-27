@@ -177,3 +177,84 @@ export interface DocumentDraft {
   terms: string;
   items: Array<{ productId: string; description: string; quantity: string; unitPrice: string }>;
 }
+
+/* ------------------------------------------------------------------
+   Presentación de la hoja (identidad de marca)
+------------------------------------------------------------------- */
+
+/** Color de marca por defecto de la hoja de documentos. */
+export const DEFAULT_DOC_ACCENT = "#e30613";
+const DOC_INK = "#0a0a0a";
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+/** Luminancia relativa WCAG de un color #RRGGBB. */
+function luminance(hex: string): number {
+  const channel = (i: number) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/** Contraste WCAG (1–21) entre dos colores #RRGGBB. */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+export interface AccentTokens {
+  /** Color de marca ya validado (#rrggbb en minúsculas). */
+  accent: string;
+  /** El acento como texto grande sobre papel blanco (número de 25 pt): pide 3:1. */
+  ink: string;
+  /** El acento como texto de tamaño normal (ordinales de línea y de cláusula): pide 4.5:1. */
+  inkSmall: string;
+  /** Texto sobre un fondo de acento (tecla del total, rectángulo del logotipo). */
+  fg: string;
+}
+
+/**
+ * Colores de la hoja a partir del color de marca de la sub-empresa. Valida el
+ * formato (lo que no sea #RRGGBB cae al color por defecto: el valor acaba en un
+ * `style`) y cuida el contraste: un acento claro no se usa como texto sobre
+ * blanco (< 3:1 en el número, que es texto grande; < 4.5:1 en los ordinales) ni
+ * lleva texto blanco encima (< 4.5:1). Lo que no llega va en negro.
+ */
+export function accentTokens(hex: string | null | undefined): AccentTokens {
+  const accent = hex && HEX_COLOR.test(hex) ? hex.toLowerCase() : DEFAULT_DOC_ACCENT;
+  const onWhite = contrastRatio(accent, "#ffffff");
+  return {
+    accent,
+    ink: onWhite >= 3 ? accent : DOC_INK,
+    inkSmall: onWhite >= 4.5 ? accent : DOC_INK,
+    fg: onWhite >= 4.5 ? "#ffffff" : DOC_INK,
+  };
+}
+
+/**
+ * Tamaño del titular de la hoja según el texto: `xl` (74 pt) hasta 8 letras,
+ * `lg` (52 pt) hasta 12 y `md` (40 pt) si es más largo o tiene varias palabras,
+ * que van una por línea.
+ */
+export function titleSize(label: string): { size: "xl" | "lg" | "md"; lines: string[] } {
+  const text = label.trim();
+  const lines = text.split(/\s+/).filter(Boolean);
+  if (lines.length > 1) return { size: "md", lines };
+  const letters = Array.from(text).length;
+  return { size: letters <= 8 ? "xl" : letters <= 12 ? "lg" : "md", lines: [text] };
+}
+
+/**
+ * Cuerpo del importe en la tecla del total según lo largo que sea ya formateado:
+ * hasta «999.999,99 €» (12 caracteres) cabe a 30 pt; después baja a 24 y a 19 pt.
+ */
+export function totalSize(amount: string): "normal" | "largo" | "xlargo" {
+  const chars = Array.from(amount).length;
+  return chars <= 12 ? "normal" : chars <= 14 ? "largo" : "xlargo";
+}
+
+/** Signo menos tipográfico («−», U+2212) en lugar del guion de `Intl` para los negativos. */
+export function typographicMinus(text: string): string {
+  return text.replace(/^-/, "\u2212");
+}

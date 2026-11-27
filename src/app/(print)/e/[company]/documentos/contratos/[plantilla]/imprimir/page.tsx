@@ -27,8 +27,8 @@ export default async function PrintContractPage({ params, searchParams }: Props)
   const contract = buildContract(template, contractValues(company, customer, req));
   return (
     <>
-      <PrintToolbar backHref={`/e/${company.slug}/documentos/contratos/${template.slug}?${contractQuery(template, req)}`} backLabel="Volver a editar" hint="En el diálogo, elige «Guardar como PDF» para obtener el archivo." />
-      <ContractPaper contract={contract} />
+      <PrintToolbar backHref={`/e/${company.slug}/documentos/contratos/${template.slug}?${contractQuery(template, req)}`} backLabel="Volver a editar" hint="En el diálogo: «Guardar como PDF», sin encabezados ni pies." />
+      <ContractPaper contract={contract} brand={{ name: company.name, accent: company.brandColor, contact: [company.website, company.contactEmail, company.contactPhone] }} standalone />
     </>
   );
 }

@@ -22,6 +22,13 @@
       "when": 1795728378646,
       "tag": "0002_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795794106959,
+      "tag": "0003_brand_color",
+      "breakpoints": true
     }
   ]
 }
