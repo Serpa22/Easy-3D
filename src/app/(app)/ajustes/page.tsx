@@ -222,7 +222,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <>
         {header}
         <Card>
-          <CardHeader title="Datos de ejemplo" description="Dos sub-empresas de demostración («Teclas» y «Figuras») con máquinas simuladas, pedidos, finanzas e historial para explorar la app." />
+          <CardHeader title="Datos de ejemplo" description="Dos sub-empresas de demostración («Prokeys» y «Figuras») con máquinas simuladas, pedidos, finanzas e historial para explorar la app." />
           <CardBody className="flex flex-wrap items-center gap-3">
             {owner ? (
               <>

@@ -22,12 +22,12 @@ test("primer arranque: crea la cuenta y carga los datos de ejemplo", async () =>
   await page.getByRole("button", { name: "Crear cuenta y entrar" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Easy 3D" })).toBeVisible({ timeout: 60_000 });
   // La vista de grupo enseña las dos sub-empresas de demostración.
-  await expect(page.getByRole("link", { name: "Teclas", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Prokeys", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Figuras", exact: true }).first()).toBeVisible();
 });
 
 test("entra en una sub-empresa y ve sus máquinas en directo", async () => {
-  await page.goto("/e/teclas/maquinas");
+  await page.goto("/e/prokeys/maquinas");
   await expect(page.getByRole("heading", { level: 1, name: "Máquinas" })).toBeVisible();
   await expect(page.getByText(/máquinas trabajando ahora/)).toBeVisible();
   // Las impresoras simuladas empiezan a informar en unos segundos.
@@ -36,7 +36,7 @@ test("entra en una sub-empresa y ve sus máquinas en directo", async () => {
   await page.getByRole("link", { name: "Bambu Lab P1S · 1" }).click();
   await expect(page.getByRole("heading", { name: "Eventos en directo" })).toBeVisible();
   // El estado en directo llega por /api/live.
-  const live = await page.request.get("/api/live?company=teclas");
+  const live = await page.request.get("/api/live?company=prokeys");
   expect(live.ok()).toBeTruthy();
   const snapshot = await live.json();
   expect(snapshot.machines.length).toBe(5);
@@ -44,7 +44,7 @@ test("entra en una sub-empresa y ve sus máquinas en directo", async () => {
 });
 
 test("finanzas: crea, valida y elimina un gasto manual", async () => {
-  await page.goto("/e/teclas/finanzas");
+  await page.goto("/e/prokeys/finanzas");
   await page.getByRole("button", { name: "Nuevo gasto" }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Concepto").fill("Pinzas de precisión E2E");
@@ -65,7 +65,7 @@ test("finanzas: crea, valida y elimina un gasto manual", async () => {
 });
 
 test("máquina: editarla no borra su gasto de compra, y una dirección mal escrita se rechaza", async () => {
-  await page.goto("/e/teclas/maquinas");
+  await page.goto("/e/prokeys/maquinas");
   await page.getByRole("button", { name: "Añadir máquina" }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel(/^Nombre/).fill("Impresora E2E");
@@ -82,11 +82,11 @@ test("máquina: editarla no borra su gasto de compra, y una dirección mal escri
   await expect(page.getByText("Máquina añadida")).toBeVisible();
 
   const expense = () => page.getByRole("row", { name: /Compra de Impresora E2E/ });
-  await page.goto("/e/teclas/finanzas?mes=2026-01");
+  await page.goto("/e/prokeys/finanzas?mes=2026-01");
   await expect(expense()).toContainText("−699,00 €");
 
   // Se edita otro dato de la máquina y se guarda: la casilla sale marcada y el gasto sigue ahí.
-  await page.goto("/e/teclas/maquinas");
+  await page.goto("/e/prokeys/maquinas");
   await page.getByRole("link", { name: "Impresora E2E" }).click();
   await expect(page).toHaveURL(/\/maquinas\/[0-9a-f-]{36}$/);
   await page.goto(`${page.url()}?tab=ajustes`);
@@ -94,25 +94,25 @@ test("máquina: editarla no borra su gasto de compra, y una dirección mal escri
   await page.getByLabel("Ubicación").fill("Estantería 2");
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.getByText("Máquina actualizada")).toBeVisible();
-  await page.goto("/e/teclas/finanzas?mes=2026-01");
+  await page.goto("/e/prokeys/finanzas?mes=2026-01");
   await expect(expense()).toContainText("−699,00 €");
 });
 
 test("pedido: al cobrarlo aparece el ingreso en finanzas y no se ve desde otra sub-empresa", async () => {
-  await page.goto("/e/teclas/pedidos/nuevo");
+  await page.goto("/e/prokeys/pedidos/nuevo");
   await page.getByLabel(/^Nombre/).fill("Cliente E2E");
   await page.getByLabel("Descripción de la línea 1").fill("Tecla a medida");
   await page.getByLabel("Precio de la línea 1").fill("19,90");
   await page.getByLabel("Cantidad de la línea 1").fill("2");
   await expect(page.getByText("39,80 €").first()).toBeVisible(); // total en vivo
   await page.getByRole("button", { name: "Crear pedido" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: /Pedido TEC-\d{4}/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Pedido PRO-\d{4}/ })).toBeVisible();
   const number = (await page.getByRole("heading", { level: 1 }).innerText()).replace("Pedido ", "");
 
   await page.getByRole("button", { name: "Marcar cobrado" }).click();
   await expect(page.getByText("Pedido marcado como cobrado")).toBeVisible();
 
-  await page.goto(`/e/teclas/finanzas?q=${number}`);
+  await page.goto(`/e/prokeys/finanzas?q=${number}`);
   await expect(page.getByRole("row", { name: new RegExp(`Pedido ${number} · Cliente E2E`) })).toContainText("+39,80 €");
 
   // Aislamiento: la otra sub-empresa no ve ese pedido ni su ingreso.
@@ -126,7 +126,7 @@ test("sesión: cerrar sesión protege la app y el acceso exige la contraseña co
   await page.goto("/");
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page).toHaveURL(/\/login$/);
-  await page.goto("/e/teclas/finanzas");
+  await page.goto("/e/prokeys/finanzas");
   await expect(page).toHaveURL(/\/login$/);
   expect((await page.request.get("/api/live")).status()).toBe(401);
 
@@ -154,7 +154,7 @@ test("sin JavaScript, enviar el acceso no deja la contraseña en la URL", async 
 });
 
 test("documentos: factura desde un pedido, rectificativa y vista de impresión", async () => {
-  await page.goto("/e/teclas/pedidos?estado=todos");
+  await page.goto("/e/prokeys/pedidos?estado=todos");
   await page.locator("tbody tr a").first().click();
   await page.getByRole("button", { name: "Generar documento" }).click();
   await page.getByRole("menuitem", { name: "Factura", exact: true }).click();

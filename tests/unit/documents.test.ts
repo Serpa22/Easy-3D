@@ -99,7 +99,7 @@ describe("presentación de la hoja", () => {
 describe("documentos", () => {
   it("numera de forma correlativa por tipo y año", async () => {
     const db = await getDb();
-    const company = await makeCompany("Teclas", { taxId: "12345678Z", fiscalCity: "Madrid" });
+    const company = await makeCompany("Prokeys", { taxId: "12345678Z", fiscalCity: "Madrid" });
     const a = await saveDocument(db, company, input());
     const b = await saveDocument(db, company, input({ issueDate: "2026-11-21" }));
     const q = await saveDocument(db, company, input({ kind: "quote" }));
@@ -172,7 +172,7 @@ describe("documentos", () => {
 
   it("aísla por empresa", async () => {
     const db = await getDb();
-    const a = await makeCompany("Teclas");
+    const a = await makeCompany("Prokeys");
     const b = await makeCompany("Figuras");
     const doc = await saveDocument(db, a, input({ kind: "quote" }));
     await expect(deleteDocument(db, b.id, doc.id)).rejects.toThrow(/no existe/);

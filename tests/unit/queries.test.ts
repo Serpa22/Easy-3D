@@ -37,7 +37,7 @@ beforeAll(async () => {
   await freshDb();
   await seedDemoData();
   db = await getDb();
-  [company] = await db.select().from(companies).where(eq(companies.slug, "teclas"));
+  [company] = await db.select().from(companies).where(eq(companies.slug, "prokeys"));
 });
 
 describe("lecturas de las páginas", () => {

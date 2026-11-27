@@ -33,7 +33,7 @@ export default async function GroupPage() {
         <EmptyState
           icon={<Building2 />}
           title="Crea tu primera sub-empresa"
-          description="Cada sub-empresa (teclas, figuras…) lleva por separado sus finanzas, pedidos, envíos, máquinas, materiales y energía. Aquí verás el resumen de todas."
+          description="Cada sub-empresa (Prokeys, Figuras…) lleva por separado sus finanzas, pedidos, envíos, máquinas, materiales y energía. Aquí verás el resumen de todas."
           action={<NewCompanyButton variant="primary">Crear sub-empresa</NewCompanyButton>}
         />
       </>

@@ -1,6 +1,6 @@
 # Easy 3D
 
-Aplicación de gestión para una empresa de impresión 3D con **sub-empresas** (p. ej. «Teclas» para teclados, «Figuras»…). Desde la app se entra a cada sub-empresa y se controla de forma independiente: finanzas (ingresos y gastos), pedidos, clientes, envíos, productos y costes, maquinaria con estado **en directo**, historial de impresiones, materiales, energía/luz. Además hay una vista de grupo que resume todas.
+Aplicación de gestión para una empresa de impresión 3D con **sub-empresas** (p. ej. «Prokeys» para teclados, «Figuras»…). Desde la app se entra a cada sub-empresa y se controla de forma independiente: finanzas (ingresos y gastos), pedidos, clientes, envíos, productos y costes, maquinaria con estado **en directo**, historial de impresiones, materiales, energía/luz. Además hay una vista de grupo que resume todas.
 
 Toda la interfaz está en **español de España**. Moneda EUR, formato es-ES, zona horaria por defecto Europe/Madrid.
 

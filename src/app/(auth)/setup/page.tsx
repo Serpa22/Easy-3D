@@ -31,8 +31,8 @@ export default async function SetupPage() {
           <Input type="password" autoComplete="new-password" minLength={8} />
         </Field>
         <hr className="my-1 border-0 border-t border-line" />
-        <Field label="Primera sub-empresa" name="companyName" hint="Por ejemplo «Teclas». Déjalo vacío para crearla más tarde.">
-          <Input placeholder="Teclas" maxLength={80} />
+        <Field label="Primera sub-empresa" name="companyName" hint="Por ejemplo «Prokeys». Déjalo vacío para crearla más tarde.">
+          <Input placeholder="Prokeys" maxLength={80} />
         </Field>
         <Field label="Actividad" name="companyActivity">
           <Input placeholder="Teclas para teclados mecánicos" maxLength={120} />

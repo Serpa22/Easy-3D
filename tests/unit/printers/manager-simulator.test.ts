@@ -96,7 +96,7 @@ describe("de extremo a extremo con el simulador", () => {
   it("unas horas simuladas dejan impresiones cerradas con energía y eventos", async () => {
     await freshDb();
     const db = await getDb();
-    const company = await makeCompany("Teclas");
+    const company = await makeCompany("Prokeys");
     const [machine] = await db.insert(machines).values({ companyId: company.id, name: "Sim", connectionType: "simulator", powerPrintW: 120 }).returning();
     const seed = seedFrom(machine.id);
     const start = Date.parse("2026-11-20T00:00:00Z");

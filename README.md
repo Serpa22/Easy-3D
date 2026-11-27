@@ -1,6 +1,6 @@
 # Easy 3D
 
-Aplicación para gestionar una empresa de impresión 3D organizada en **sub-empresas** (por ejemplo «Teclas» para teclados y «Figuras»). Desde la vista de grupo se entra a cada sub-empresa y se controla por separado:
+Aplicación para gestionar una empresa de impresión 3D organizada en **sub-empresas** (por ejemplo «Prokeys» para teclados y «Figuras»). Desde la vista de grupo se entra a cada sub-empresa y se controla por separado:
 
 | Sección | Qué hace |
 | --- | --- |

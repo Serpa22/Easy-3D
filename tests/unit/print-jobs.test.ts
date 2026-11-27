@@ -7,7 +7,7 @@ import { freshDb, makeCompany } from "../helpers/db";
 
 async function setup() {
   const db = await getDb();
-  const company = await makeCompany("Teclas", { electricityMode: "fixed", kwhPrice: 0.2 });
+  const company = await makeCompany("Prokeys", { electricityMode: "fixed", kwhPrice: 0.2 });
   const [material] = await db
     .insert(materials)
     .values({ companyId: company.id, name: "PLA negro", unit: "g", stockQty: 1000, packSize: 1000, packCostCents: 2000 })

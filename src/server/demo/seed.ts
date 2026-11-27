@@ -8,7 +8,7 @@
  * (misma fecha → mismos datos) e idempotente (no duplica si ya existen).
  */
 import "server-only";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { getDb, type Db, type Tx } from "@/server/db";
 import {
   companies,
@@ -32,7 +32,7 @@ import {
 import { count, sum } from "@/server/db/sql";
 import { addDays, addMonths, diffDays, monthOf, monthRange, startOfDayInZone, todayISO } from "@/lib/dates";
 import type { MaintenanceType, OrderStatus, SalesChannel, ShipmentStatus } from "@/lib/domain";
-import { createCompany, nextOrderNumber } from "@/server/domain/companies";
+import { createCompany, nextOrderNumber, uniqueCompanySlug } from "@/server/domain/companies";
 import { syncEnergyBillExpense, syncMachinePurchaseExpense, syncMaintenanceExpense, syncShipmentExpense } from "@/server/domain/derived-expenses";
 import { computeOrderTotals, syncOrderEffects } from "@/server/domain/orders";
 import { finishPrintJob, startPrintJob } from "@/server/domain/print-jobs";
@@ -43,7 +43,16 @@ import { getOrgSettings } from "@/server/settings";
 /** Marca que identifica a las empresas creadas por el generador (para poder borrarlas con seguridad). */
 /** Texto descriptivo de las empresas de ejemplo. Solo informa: lo que las identifica es `companies.demoKey`. */
 export const DEMO_MARKER = "Empresa de demostración.";
-export const DEMO_SLUGS = ["teclas", "figuras"] as const;
+export const DEMO_SLUGS = ["prokeys", "figuras"] as const;
+/**
+ * Claves que el generador escribió en `companies.demoKey` en versiones anteriores
+ * (la empresa de ejemplo «Prokeys» se llamaba antes «Teclas»). Una instalación que
+ * ya tenga esa empresa de ejemplo con datos la conserva tal cual: se reconoce por su
+ * clave heredada y no se crea otra al volver a cargar los datos de ejemplo. Si está
+ * vacía se rellena como cualquier otra, y entonces pasa a llamarse como la actual
+ * (nombre y URL incluidos) para no quedar con el nombre antiguo y los datos nuevos.
+ */
+const LEGACY_DEMO_KEYS: Partial<Record<(typeof DEMO_SLUGS)[number], readonly string[]>> = { prokeys: ["teclas"] };
 
 /* ------------------------------ Utilidades ------------------------------ */
 
@@ -154,13 +163,13 @@ interface CompanySpec {
   jobNames: string[];
 }
 
-const TECLAS: CompanySpec = {
+const PROKEYS: CompanySpec = {
   seed: 20260101,
-  slug: "teclas",
-  name: "Teclas",
+  slug: "prokeys",
+  name: "Prokeys",
   activity: "Teclas artesanales para teclados mecánicos",
-  prefix: "TEC",
-  monogram: "TE",
+  prefix: "PRO",
+  monogram: "PK",
   months: 8,
   electricity: "tou",
   customers: 36,
@@ -186,18 +195,18 @@ const TECLAS: CompanySpec = {
     { name: "Bolsa zip antiestática", kind: "packaging", unit: "ud", packSize: 200, packCostCents: 1400, threshold: 80 },
   ],
   products: [
-    { name: "Set Cherry 61 teclas · Negro", sku: "TEC-SET61-NG", category: "Sets", priceCents: 4490, material: 0, materialQty: 78, printMinutes: 310, laborMinutes: 12, packagingCents: 45, batch: 1, weight: 9 },
-    { name: "Set Cherry 61 teclas · Hueso", sku: "TEC-SET61-HU", category: "Sets", priceCents: 4490, material: 1, materialQty: 78, printMinutes: 310, laborMinutes: 12, packagingCents: 45, batch: 1, weight: 8 },
-    { name: "Set TKL 87 teclas · Negro", sku: "TEC-SET87-NG", category: "Sets", priceCents: 5990, material: 0, materialQty: 112, printMinutes: 430, laborMinutes: 15, packagingCents: 45, batch: 1, weight: 6 },
-    { name: "Tecla artesanal Dragón", sku: "TEC-ART-DRG", category: "Artesanales", priceCents: 1690, material: 3, materialQty: 6, printMinutes: 48, laborMinutes: 8, packagingCents: 20, batch: 6, weight: 10 },
-    { name: "Tecla artesanal Montaña", sku: "TEC-ART-MNT", category: "Artesanales", priceCents: 1490, material: 2, materialQty: 5, printMinutes: 42, laborMinutes: 8, packagingCents: 20, batch: 6, weight: 9 },
-    { name: "Tecla artesanal Gato", sku: "TEC-ART-GAT", category: "Artesanales", priceCents: 1490, material: 5, materialQty: 5, printMinutes: 40, laborMinutes: 8, packagingCents: 20, batch: 6, weight: 8 },
-    { name: "Barra espaciadora 6.25u", sku: "TEC-SPC-625", category: "Sueltas", priceCents: 890, material: 0, materialQty: 9, printMinutes: 55, laborMinutes: 3, packagingCents: 15, batch: 4, weight: 5 },
-    { name: "Pack 4 flechas translúcidas", sku: "TEC-ARR-TR", category: "Sueltas", priceCents: 990, material: 2, materialQty: 7, printMinutes: 46, laborMinutes: 4, packagingCents: 15, batch: 5, weight: 6 },
-    { name: "Tecla Escape Silk Dorado", sku: "TEC-ESC-DOR", category: "Sueltas", priceCents: 690, material: 3, materialQty: 3, printMinutes: 22, laborMinutes: 3, packagingCents: 15, batch: 9, weight: 6 },
-    { name: "Reposamuñecas flexible", sku: "TEC-RPM-TPU", category: "Accesorios", priceCents: 2490, material: 4, materialQty: 95, printMinutes: 280, laborMinutes: 6, packagingCents: 45, batch: 1, weight: 3 },
-    { name: "Extractor de teclas", sku: "TEC-EXT-01", category: "Accesorios", priceCents: 490, material: 5, materialQty: 8, printMinutes: 26, laborMinutes: 2, packagingCents: 10, batch: 8, weight: 4 },
-    { name: "Soporte expositor 12 teclas", sku: "TEC-EXP-12", category: "Accesorios", priceCents: 1890, material: 1, materialQty: 64, printMinutes: 190, laborMinutes: 5, packagingCents: 45, batch: 1, weight: 3 },
+    { name: "Set Cherry 61 teclas · Negro", sku: "PRO-SET61-NG", category: "Sets", priceCents: 4490, material: 0, materialQty: 78, printMinutes: 310, laborMinutes: 12, packagingCents: 45, batch: 1, weight: 9 },
+    { name: "Set Cherry 61 teclas · Hueso", sku: "PRO-SET61-HU", category: "Sets", priceCents: 4490, material: 1, materialQty: 78, printMinutes: 310, laborMinutes: 12, packagingCents: 45, batch: 1, weight: 8 },
+    { name: "Set TKL 87 teclas · Negro", sku: "PRO-SET87-NG", category: "Sets", priceCents: 5990, material: 0, materialQty: 112, printMinutes: 430, laborMinutes: 15, packagingCents: 45, batch: 1, weight: 6 },
+    { name: "Tecla artesanal Dragón", sku: "PRO-ART-DRG", category: "Artesanales", priceCents: 1690, material: 3, materialQty: 6, printMinutes: 48, laborMinutes: 8, packagingCents: 20, batch: 6, weight: 10 },
+    { name: "Tecla artesanal Montaña", sku: "PRO-ART-MNT", category: "Artesanales", priceCents: 1490, material: 2, materialQty: 5, printMinutes: 42, laborMinutes: 8, packagingCents: 20, batch: 6, weight: 9 },
+    { name: "Tecla artesanal Gato", sku: "PRO-ART-GAT", category: "Artesanales", priceCents: 1490, material: 5, materialQty: 5, printMinutes: 40, laborMinutes: 8, packagingCents: 20, batch: 6, weight: 8 },
+    { name: "Barra espaciadora 6.25u", sku: "PRO-SPC-625", category: "Sueltas", priceCents: 890, material: 0, materialQty: 9, printMinutes: 55, laborMinutes: 3, packagingCents: 15, batch: 4, weight: 5 },
+    { name: "Pack 4 flechas translúcidas", sku: "PRO-ARR-TR", category: "Sueltas", priceCents: 990, material: 2, materialQty: 7, printMinutes: 46, laborMinutes: 4, packagingCents: 15, batch: 5, weight: 6 },
+    { name: "Tecla Escape Silk Dorado", sku: "PRO-ESC-DOR", category: "Sueltas", priceCents: 690, material: 3, materialQty: 3, printMinutes: 22, laborMinutes: 3, packagingCents: 15, batch: 9, weight: 6 },
+    { name: "Reposamuñecas flexible", sku: "PRO-RPM-TPU", category: "Accesorios", priceCents: 2490, material: 4, materialQty: 95, printMinutes: 280, laborMinutes: 6, packagingCents: 45, batch: 1, weight: 3 },
+    { name: "Extractor de teclas", sku: "PRO-EXT-01", category: "Accesorios", priceCents: 490, material: 5, materialQty: 8, printMinutes: 26, laborMinutes: 2, packagingCents: 10, batch: 8, weight: 4 },
+    { name: "Soporte expositor 12 teclas", sku: "PRO-EXP-12", category: "Accesorios", priceCents: 1890, material: 1, materialQty: 64, printMinutes: 190, laborMinutes: 5, packagingCents: 45, batch: 1, weight: 3 },
   ],
   channels: [["web", 34], ["etsy", 30], ["instagram", 14], ["wallapop", 8], ["direct", 9], ["whatsapp", 5]],
   recurring: [
@@ -271,14 +280,28 @@ async function seedCompany(tx: Tx, spec: CompanySpec, today: string, timeZone: s
   const rng = mulberry32(spec.seed);
   // Solo se reutiliza una empresa que este mismo generador creó (marcada con `demoKey`).
   // Nunca se adopta una empresa real, aunque se llame igual y esté vacía.
-  const [existing] = await tx.select().from(companies).where(eq(companies.demoKey, spec.slug)).limit(1);
+  // También vale la clave con la que una versión anterior marcó esta misma empresa de ejemplo.
+  const keys = [spec.slug, ...(LEGACY_DEMO_KEYS[spec.slug] ?? [])];
+  const [existing] = await tx.select().from(companies).where(inArray(companies.demoKey, keys)).orderBy(asc(companies.createdAt), asc(companies.id)).limit(1);
   if (existing && !(await isEmptyCompany(tx, existing.id))) return;
 
+  // Si ya hay una empresa real con ese nombre, la de ejemplo se distingue en el nombre (y en la URL).
+  const demoName = async () => {
+    const [taken] = await tx.select({ id: companies.id }).from(companies).where(eq(companies.slug, spec.slug)).limit(1);
+    return taken ? `${spec.name} (ejemplo)` : spec.name;
+  };
   let base: Company | undefined = existing;
   if (!base) {
-    // Si ya hay una empresa real con ese nombre, la de ejemplo se distingue en el nombre (y en la URL).
-    const [taken] = await tx.select({ id: companies.id }).from(companies).where(eq(companies.slug, spec.slug)).limit(1);
-    base = await createCompany(tx, { name: taken ? `${spec.name} (ejemplo)` : spec.name, activity: spec.activity });
+    base = await createCompany(tx, { name: await demoName(), activity: spec.activity });
+  } else if (base.demoKey !== spec.slug) {
+    // Empresa de ejemplo vacía de una versión anterior: se va a rellenar con los datos actuales,
+    // así que toma también el nombre y la URL actuales.
+    const name = await demoName();
+    [base] = await tx
+      .update(companies)
+      .set({ name, slug: await uniqueCompanySlug(tx, name) })
+      .where(eq(companies.id, base.id))
+      .returning();
   }
   const [company] = await tx
     .update(companies)
@@ -688,7 +711,7 @@ export async function seedDemoData(): Promise<void> {
   const db = await getDb();
   const org = await getOrgSettings();
   const today = todayISO(org.timeZone);
-  for (const spec of [TECLAS, FIGURAS]) {
+  for (const spec of [PROKEYS, FIGURAS]) {
     await db.transaction((tx) => seedCompany(tx, spec, today, org.timeZone));
   }
 }

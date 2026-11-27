@@ -30,7 +30,7 @@ describe("datos de demostración", () => {
     const db = await getDb();
     const first = await snapshot();
 
-    expect((await db.select().from(companies)).map((c) => c.slug).sort()).toEqual(["figuras", "teclas"]);
+    expect((await db.select().from(companies)).map((c) => c.slug).sort()).toEqual(["figuras", "prokeys"]);
     expect(first.orders).toBeGreaterThan(120);
     expect(first.jobs).toBeGreaterThan(150);
     expect(first.shipments).toBeGreaterThan(80);
@@ -67,22 +67,22 @@ describe("datos de demostración", () => {
   it("nunca adopta ni borra una empresa real, aunque se llame igual, esté vacía o copie la descripción", async () => {
     await freshDb();
     const db = await getDb();
-    // Empresa real «Figuras» con datos, y empresa real «Teclas» recién creada (vacía),
+    // Empresa real «Figuras» con datos, y empresa real «Prokeys» recién creada (vacía),
     // a la que además alguien le ha copiado la descripción de las de ejemplo.
     const figuras = await createCompany(db, { name: "Figuras" });
     await db.insert(machines).values({ companyId: figuras.id, name: "Mi impresora" });
-    const teclas = await createCompany(db, { name: "Teclas", description: DEMO_MARKER });
+    const prokeys = await createCompany(db, { name: "Prokeys", description: DEMO_MARKER });
 
     await seedDemoData();
     const all = await db.select().from(companies);
     expect(all.map((c) => [c.slug, c.demoKey]).sort()).toEqual([
       ["figuras", null],
       ["figuras-ejemplo", "figuras"],
-      ["teclas", null],
-      ["teclas-ejemplo", "teclas"],
+      ["prokeys", null],
+      ["prokeys-ejemplo", "prokeys"],
     ]);
     // Las reales siguen intactas: ningún pedido de ejemplo se ha mezclado en ellas.
-    expect(await db.select().from(orders).where(eq(orders.companyId, teclas.id))).toHaveLength(0);
+    expect(await db.select().from(orders).where(eq(orders.companyId, prokeys.id))).toHaveLength(0);
     expect(await db.select().from(orders).where(eq(orders.companyId, figuras.id))).toHaveLength(0);
 
     // Volver a generar no duplica las de ejemplo.
@@ -91,7 +91,57 @@ describe("datos de demostración", () => {
 
     expect(await removeDemoData()).toBe(2);
     const left = await db.select().from(companies);
-    expect(left.map((c) => c.slug).sort()).toEqual(["figuras", "teclas"]);
+    expect(left.map((c) => c.slug).sort()).toEqual(["figuras", "prokeys"]);
     expect((await db.select().from(machines).where(and(eq(machines.companyId, figuras.id)))).length).toBe(1);
+  }, 240_000);
+
+  it("reconoce la empresa de ejemplo de una instalación anterior (clave heredada «teclas») y no la duplica", async () => {
+    await freshDb();
+    const db = await getDb();
+    // Así la dejó el generador antes del cambio de nombre: «Teclas», /e/teclas, demoKey «teclas», con datos.
+    const old = await createCompany(db, { name: "Teclas", description: DEMO_MARKER });
+    await db.update(companies).set({ demoKey: "teclas", orderPrefix: "TEC" }).where(eq(companies.id, old.id));
+    await db.insert(machines).values({ companyId: old.id, name: "Bambu Lab P1S · 1" });
+
+    await seedDemoData();
+    await seedDemoData();
+    const all = await db.select().from(companies);
+    // No aparece una segunda empresa de teclados; la antigua queda como estaba (no se renombra ni se rellena).
+    expect(all.map((c) => [c.slug, c.name, c.demoKey, c.orderPrefix]).sort()).toEqual([
+      ["figuras", "Figuras", "figuras", "FIG"],
+      ["teclas", "Teclas", "teclas", "TEC"],
+    ]);
+    expect(await db.select().from(orders).where(eq(orders.companyId, old.id))).toHaveLength(0);
+    expect(await db.select().from(machines).where(eq(machines.companyId, old.id))).toHaveLength(1);
+
+    // «Eliminar datos de ejemplo» la sigue borrando.
+    expect(await removeDemoData()).toBe(2);
+    expect(await db.select().from(companies)).toHaveLength(0);
+  }, 240_000);
+
+  it("una empresa de ejemplo heredada y vacía se rellena y pasa a llamarse «Prokeys» (nombre y URL)", async () => {
+    await freshDb();
+    const db = await getDb();
+    // La de ejemplo antigua, vaciada a mano, y además una empresa real que no debe tocarse.
+    const old = await createCompany(db, { name: "Teclas", description: DEMO_MARKER });
+    await db.update(companies).set({ demoKey: "teclas", orderPrefix: "TEC" }).where(eq(companies.id, old.id));
+    const real = await createCompany(db, { name: "Teclas Artesanas" });
+
+    await seedDemoData();
+    await seedDemoData();
+    const all = await db.select().from(companies);
+    expect(all.map((c) => [c.slug, c.name, c.demoKey, c.orderPrefix]).sort()).toEqual([
+      ["figuras", "Figuras", "figuras", "FIG"],
+      ["prokeys", "Prokeys", "prokeys", "PRO"],
+      [real.slug, "Teclas Artesanas", null, real.orderPrefix],
+    ]);
+    // Es la misma fila, ya coherente: razón social y correo con el nombre nuevo, y con datos.
+    const [renamed] = await db.select().from(companies).where(eq(companies.id, old.id));
+    expect([renamed.slug, renamed.legalName, renamed.contactEmail]).toEqual(["prokeys", "Prokeys Estudio 3D, S.L.", "hola@prokeys.example"]);
+    expect((await db.select().from(orders).where(eq(orders.companyId, old.id))).length).toBeGreaterThan(0);
+    expect(await db.select().from(orders).where(eq(orders.companyId, real.id))).toHaveLength(0);
+
+    expect(await removeDemoData()).toBe(2);
+    expect((await db.select().from(companies)).map((c) => c.id)).toEqual([real.id]);
   }, 240_000);
 });

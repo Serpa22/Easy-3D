@@ -23,7 +23,7 @@ export async function freshDb() {
   return getDb();
 }
 
-export async function makeCompany(name = "Teclas", patch: Partial<typeof companies.$inferInsert> = {}): Promise<Company> {
+export async function makeCompany(name = "Prokeys", patch: Partial<typeof companies.$inferInsert> = {}): Promise<Company> {
   const db = await getDb();
   const company = await createCompany(db, { name });
   if (Object.keys(patch).length === 0) return company;

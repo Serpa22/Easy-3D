@@ -12,7 +12,7 @@ const TODAY = "2026-11-25";
 
 async function setup() {
   const db = await getDb();
-  const company = await makeCompany("Teclas", { electricityMode: "fixed", kwhPrice: 0.2 });
+  const company = await makeCompany("Prokeys", { electricityMode: "fixed", kwhPrice: 0.2 });
   const other = await makeCompany("Figuras");
   const [pla] = await db.insert(materials).values({ companyId: company.id, name: "PLA", unit: "g", stockQty: 1000, packSize: 1000, packCostCents: 2000 }).returning();
   const [petg] = await db.insert(materials).values({ companyId: company.id, name: "PETG", unit: "g", stockQty: 1000, packSize: 1000, packCostCents: 2500 }).returning();
@@ -35,10 +35,10 @@ describe("servicio de pedidos", () => {
     const { db, company, product, foreign } = await setup();
     const saved = await saveOrder(db, company, order({ items: [{ productId: product.id, description: "Set", quantity: "2", unitPrice: "25,00" }] }), TODAY);
     const [row] = await db.select().from(orders).where(eq(orders.id, saved.id));
-    expect(row).toMatchObject({ number: "TEC-0001", subtotalCents: 5000, shippingChargedCents: 450, totalCents: 5450 });
+    expect(row).toMatchObject({ number: "PRO-0001", subtotalCents: 5000, shippingChargedCents: 450, totalCents: 5450 });
     await expect(saveOrder(db, company, order({ items: [{ productId: foreign.id, description: "x", quantity: "1", unitPrice: "1" }] }), TODAY)).rejects.toThrow("productos ya no existe");
     // Un pedido fallido no consume numeración.
-    expect((await saveOrder(db, company, order(), TODAY)).number).toBe("TEC-0002");
+    expect((await saveOrder(db, company, order(), TODAY)).number).toBe("PRO-0002");
   });
 
   it("cobrar, enviar, editar y borrar mantienen finanzas y stock", async () => {

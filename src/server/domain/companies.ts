@@ -4,7 +4,7 @@ import { eq, like, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
 import { companies, type Company } from "@/server/db/schema";
 
-/** «Teclas Artesanas 3D» → «teclas-artesanas-3d» */
+/** «Prokeys Estudio 3D» → «prokeys-estudio-3d» */
 export function slugify(input: string): string {
   const slug = input
     .normalize("NFD")
@@ -34,7 +34,7 @@ export async function uniqueCompanySlug(db: DbOrTx, name: string): Promise<strin
   return `${base}-${Date.now().toString(36)}`;
 }
 
-/** Monograma por defecto: iniciales de hasta dos palabras («Teclas Pro» → «TP», «Figuras» → «FI»). */
+/** Monograma por defecto: iniciales de hasta dos palabras («Prokeys Estudio» → «PE», «Figuras» → «FI»). */
 export function defaultMonogram(name: string): string {
   const words = name
     .normalize("NFD")
@@ -48,7 +48,7 @@ export function defaultMonogram(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-/** Prefijo de pedidos por defecto: consonantes/letras iniciales («Teclas» → «TEC»). */
+/** Prefijo de pedidos por defecto: consonantes/letras iniciales («Prokeys» → «PRO»). */
 export function defaultOrderPrefix(name: string): string {
   const letters = name
     .normalize("NFD")
@@ -83,7 +83,7 @@ export async function createCompany(db: DbOrTx, input: NewCompanyInput): Promise
 }
 
 /**
- * Reserva el siguiente número de pedido de la empresa («TEC-0042»).
+ * Reserva el siguiente número de pedido de la empresa («PRO-0042»).
  * Llamar dentro de la transacción que crea el pedido.
  */
 export async function nextOrderNumber(tx: DbOrTx, companyId: string): Promise<string> {

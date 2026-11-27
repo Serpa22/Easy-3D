@@ -18,7 +18,7 @@ export function NewCompanyDialog({ open, onClose }: { open: boolean; onClose: ()
     >
       <ActionForm action={createCompanyAction}>
         <Field label="Nombre" name="name" required>
-          <Input placeholder="Teclas" autoFocus maxLength={80} />
+          <Input placeholder="Prokeys" autoFocus maxLength={80} />
         </Field>
         <Field label="Actividad" name="activity" hint="A qué se dedica. Aparece junto al nombre.">
           <Input placeholder="Teclas artesanales para teclados mecánicos" maxLength={120} />

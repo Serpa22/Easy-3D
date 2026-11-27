@@ -14,26 +14,26 @@ beforeEach(async () => {
 describe("empresas", () => {
   it("genera slugs únicos y legibles", async () => {
     const db = await getDb();
-    expect(slugify("Teclas Artesanas 3D")).toBe("teclas-artesanas-3d");
+    expect(slugify("Prokeys Estudio 3D")).toBe("prokeys-estudio-3d");
     expect(slugify("  Ñandú & Cía.  ")).toBe("nandu-cia");
     expect(slugify("!!!")).toBe("empresa");
-    const a = await createCompany(db, { name: "Teclas" });
-    const b = await createCompany(db, { name: "Teclas" });
+    const a = await createCompany(db, { name: "Prokeys" });
+    const b = await createCompany(db, { name: "Prokeys" });
     const c = await createCompany(db, { name: "Nueva" });
-    expect(a.slug).toBe("teclas");
-    expect(b.slug).toBe("teclas-2");
+    expect(a.slug).toBe("prokeys");
+    expect(b.slug).toBe("prokeys-2");
     expect(c.slug).toBe("nueva-3d"); // «nueva» está reservado por la ruta de alta
     expect(b.sortOrder).toBe(a.sortOrder + 1);
-    expect(defaultMonogram("Teclas Pro")).toBe("TP");
+    expect(defaultMonogram("Prokeys Estudio")).toBe("PE");
     expect(defaultMonogram("Figuras")).toBe("FI");
-    expect(defaultOrderPrefix("Teclas")).toBe("TEC");
+    expect(defaultOrderPrefix("Prokeys")).toBe("PRO");
   });
   it("numera pedidos de forma correlativa por empresa", async () => {
     const db = await getDb();
-    const a = await makeCompany("Teclas");
+    const a = await makeCompany("Prokeys");
     const b = await makeCompany("Figuras");
-    expect(await nextOrderNumber(db, a.id)).toBe("TEC-0001");
-    expect(await nextOrderNumber(db, a.id)).toBe("TEC-0002");
+    expect(await nextOrderNumber(db, a.id)).toBe("PRO-0001");
+    expect(await nextOrderNumber(db, a.id)).toBe("PRO-0002");
     expect(await nextOrderNumber(db, b.id)).toBe("FIG-0001");
   });
 });
@@ -51,7 +51,7 @@ describe("libro contable derivado", () => {
       category: "sales" as const,
       amountCents: 2500,
       date: "2026-11-25",
-      description: "Pedido TEC-0001",
+      description: "Pedido PRO-0001",
     };
     await syncLedgerEntry(db, entry);
     await syncLedgerEntry(db, entry);
@@ -81,7 +81,7 @@ describe("libro contable derivado", () => {
 
   it("distingue periodos con sourceKey y no toca movimientos manuales ni de otra empresa", async () => {
     const db = await getDb();
-    const a = await makeCompany("Teclas");
+    const a = await makeCompany("Prokeys");
     const b = await makeCompany("Figuras");
     const sourceId = crypto.randomUUID();
     const base = {
@@ -205,7 +205,7 @@ describe("stock de material", () => {
   });
 
   it("no permite tocar material de otra empresa", async () => {
-    const a = await makeCompany("Teclas");
+    const a = await makeCompany("Prokeys");
     const b = await makeCompany("Figuras");
     const db = await getDb();
     const m = await makeMaterial(a.id);

@@ -161,7 +161,7 @@ export const companies = pgTable("companies", {
 
   /**
    * Empresa creada por «Cargar datos de ejemplo»: qué empresa de demostración es
-   * («teclas», «figuras»). Solo la escribe el generador de datos de ejemplo
+   * («prokeys», «figuras»; «teclas» en instalaciones anteriores al cambio de nombre). Solo la escribe el generador de datos de ejemplo
    * (ningún formulario la toca) y es lo ÚNICO que autoriza a «Eliminar datos de
    * ejemplo» a borrar una empresa. null = empresa real.
    */
