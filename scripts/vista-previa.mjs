@@ -2,17 +2,17 @@
  * Capturas de la app para la vista previa (galería que se publica como artefacto).
  *
  *   npm run build
- *   node scripts/vista-previa.cjs <carpeta-de-salida>
+ *   node scripts/vista-previa.mjs <carpeta-de-salida>
  *
  * Arranca el build de producción con una base de datos limpia y los datos de
  * ejemplo, emite una factura, un presupuesto y un albarán, y captura las
  * pantallas principales en JPEG (escritorio y móvil).
  */
-const { spawn } = require("node:child_process");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { chromium } = require("playwright");
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { chromium } from "playwright";
 
 const out = path.resolve(process.argv[2] || "vista-previa");
 const PORT = 3410;
@@ -32,7 +32,7 @@ async function waitForServer() {
   fs.mkdirSync(out, { recursive: true });
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "e3d-vista-"));
   const server = spawn("npx", ["next", "start", "-p", String(PORT)], {
-    cwd: path.resolve(__dirname, ".."),
+    cwd: path.resolve(import.meta.dirname, ".."),
     env: { ...process.env, E3D_DATA_DIR: data, E3D_SECURE_COOKIES: "false" },
     stdio: "ignore",
     detached: true,
